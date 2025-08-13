@@ -13,7 +13,6 @@ import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.stream.Stream;
 
 import fibrous.soffit.SoffitObject;
 import fibrous.soffit.SoffitUtil;
@@ -218,7 +217,7 @@ class SubscriberHandler implements Runnable {
 
 class LogFileManager implements Runnable {
 	volatile ArrayList<LogFile> knownFiles;
-	volatile ArrayList<String> knownDirs;
+	volatile ArrayList<Path> knownDirs;
 	int logStorageHours;
 	long maxStorageTimeMillis;
 	String logStorageLocation;
@@ -245,16 +244,24 @@ class LogFileManager implements Runnable {
 		if(!storeLogs)
 			return;
 		
+		ArrayList<LogFile> filesToPop = new ArrayList<>();
+		
 		while(true) {
 			for(int i = 0; i < knownFiles.size(); i++) {
 				if(knownFiles.get(i).creationTime + maxStorageTimeMillis < System.currentTimeMillis()) {
 					try {
-						java.nio.file.Files.delete(Path.of(knownFiles.get(i).fullFileName));
+						java.nio.file.Files.delete(knownFiles.get(i).fullPath);
+						filesToPop.add(knownFiles.get(i));
 					} catch (IOException e) {
 						//Remove on failure
-						knownFiles.remove(i);
+						filesToPop.add(knownFiles.get(i));
 					}
 				}
+			}
+			
+			//Pop from known files list
+			for(int i = 0; i < filesToPop.size(); i++) {
+				knownFiles.remove(filesToPop.get(i));
 			}
 			
 			try {
@@ -267,41 +274,41 @@ class LogFileManager implements Runnable {
 		if(!storeLogs)
 			return;
 
-		if(!hasDir(logStorageLocation + syslogMessage.hostname)) {
+		if(!hasDir(Path.of(logStorageLocation + syslogMessage.hostname))) {
 			try {
 				if(!java.nio.file.Files.exists(Path.of(logStorageLocation + syslogMessage.hostname)))
 					java.nio.file.Files.createDirectories(Path.of(logStorageLocation + syslogMessage.hostname));
 				
-				knownDirs.add(logStorageLocation + syslogMessage.hostname);
+				knownDirs.add(Path.of(logStorageLocation + syslogMessage.hostname));
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
 		}
 		
 		try {
-			String fileName = logStorageLocation + syslogMessage.hostname + "/0";
+			String fileName = logStorageLocation + syslogMessage.hostname + "/" + syslogMessage.timestamp;
 			FileOutputStream fos = new FileOutputStream(fileName, true);
 			fos.write(data.data);
 			fos.write((int) '\n');
 			fos.close();
-			knownFiles.add(new LogFile(fileName, System.currentTimeMillis()));
+			knownFiles.add(new LogFile(Path.of(fileName), System.currentTimeMillis()));
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
 	
-	public boolean hasFile(String fullFileName) {
+	public boolean hasFile(Path file) {
 		for(int i = 0; i < knownFiles.size(); i++) {
-			if(knownFiles.get(i).fullFileName.equals(fullFileName))
+			if(knownFiles.get(i).fullPath.equals(file))
 				return true;
 		}
 		
 		return false;
 	}
 	
-	public boolean hasDir(String dirName) {
+	public boolean hasDir(Path dir) {
 		for(int i = 0; i < knownDirs.size(); i++) {
-			if(knownDirs.get(i).equals(dirName))
+			if(knownDirs.get(i).equals(dir))
 				return true;
 		}
 		
@@ -327,21 +334,21 @@ class LogFileManager implements Runnable {
 		while(paths.hasNext()) {
 			Path path = paths.next();
 			if(java.nio.file.Files.isDirectory(path)) {
-				knownDirs.add(path.toFile().getPath());
+				knownDirs.add(path);
 				recursiveFileScan(java.nio.file.Files.list(path).iterator());
 			} else {
-				knownFiles.add(new LogFile(path.toFile().getPath(), java.nio.file.Files.getLastModifiedTime(path).toMillis()));
+				knownFiles.add(new LogFile(path, java.nio.file.Files.getLastModifiedTime(path).toMillis()));
 			}
 		}
 	}
 }
 
 class LogFile {
-	String fullFileName;
+	Path fullPath;
 	long creationTime;
 	
-	public LogFile(String fullFileName, long creationTime) {
-		this.fullFileName = fullFileName;
+	public LogFile(Path fullPath, long creationTime) {
+		this.fullPath = fullPath;
 		this.creationTime = creationTime;
 	}
 }

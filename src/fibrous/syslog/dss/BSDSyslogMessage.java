@@ -105,7 +105,14 @@ public class BSDSyslogMessage {
 	}
 	
 	private static String generateTimestamp() {
-		return "";
+		Instant instant = Instant.now();
+		ZonedDateTime currentDateTime = ZonedDateTime.ofInstant(instant, ZoneId.systemDefault());
+		
+		String generatedTimeStamp = getMonthFromNumber(currentDateTime.getMonthValue()) + " " +
+				conditionalDayPad(currentDateTime.getDayOfMonth()) + " " +
+				formatTime(currentDateTime);
+		
+		return generatedTimeStamp;
 	}
 	
 	/**
