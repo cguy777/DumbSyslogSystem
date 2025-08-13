@@ -310,6 +310,11 @@ class LogFileManager implements Runnable {
 	
 	private void scanForLogs() {
 		try {
+			if(!java.nio.file.Files.exists(Path.of(logStorageLocation))) {
+				java.nio.file.Files.createDirectories(Path.of(logStorageLocation));
+				return;
+			}
+			
 			Iterator<Path> paths = java.nio.file.Files.list(Path.of(logStorageLocation)).iterator();
 			recursiveFileScan(paths);
 		} catch (IOException e) {
