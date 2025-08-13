@@ -1,0 +1,1 @@
+<30>Aug 11 00:54:31 MikroTik ospf1000 { version: 2 router-id: 10.0.255.7 } ospf-area-1 { 0.0.0.0 } interface { broadcast 10.0.255.7%ether1 } neighbor { router-id: 10.0.255.6 state: Full } hello

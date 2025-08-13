@@ -1,0 +1,26 @@
+__SoffitStart
+
+#log storage location suggestions.  The choice is ultimately up to you.
+#Feel free to uncomment whichever matches your system, or modify to your liking
+#If no storage location is specified, syslog messages will only be stored in memory.
+#LogStorageLocation "/var/DumbSyslogServer/logs"
+#LogStorageLocation "C:/DumbSyslogServer/logs"
+
+#The UDP port that syslog messages will be received on.
+#514 is the standard port 
+SyslogPort "514"
+
+#The TCP port on which a user interface will connect on.
+#Default recommended port is 54321.
+#If no port is specified then no compliant user interfaces can connect.
+#InterfacePort "54321"
+
+#How many hours logs will be stored on this device.
+#A value of 0 indicates permanent until manually deleted
+LogStorageHours "24"
+
+#The max amount of syslog messages that are stored in memory.
+#Syslog messages can always be retrieved from disk if not deleted, but this can be used for memory footprint purposes. 
+MessageBufferCount "1000"
+
+__SoffitEnd
