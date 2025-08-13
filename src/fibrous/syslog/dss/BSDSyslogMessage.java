@@ -115,6 +115,11 @@ public class BSDSyslogMessage {
 		return generatedTimeStamp;
 	}
 	
+	public String getFileFriendlyTimestamp() {
+		String friendlyTimestamp = timestamp.replace(':', '-');
+		return friendlyTimestamp;
+	}
+	
 	/**
 	 * 
 	 * @param bytes

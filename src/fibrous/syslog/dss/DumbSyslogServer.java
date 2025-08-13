@@ -286,7 +286,7 @@ class LogFileManager implements Runnable {
 		}
 		
 		try {
-			String fileName = logStorageLocation + syslogMessage.hostname + "/" + syslogMessage.timestamp;
+			String fileName = logStorageLocation + syslogMessage.hostname + "/" + syslogMessage.getFileFriendlyTimestamp();
 			FileOutputStream fos = new FileOutputStream(fileName, true);
 			fos.write(data.data);
 			fos.write((int) '\n');
