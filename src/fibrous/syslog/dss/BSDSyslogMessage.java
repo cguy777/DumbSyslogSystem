@@ -122,11 +122,6 @@ public class BSDSyslogMessage {
 		return generatedTimeStamp;
 	}
 	
-	public String getFileFriendlyTimestamp() {
-		String friendlyTimestamp = originalTimestamp.replace(':', '-');
-		return friendlyTimestamp;
-	}
-	
 	/**
 	 * 
 	 * @param bytes
@@ -134,7 +129,7 @@ public class BSDSyslogMessage {
 	 * @param timestamp
 	 * @return the position immediately after the timestamp, or -1 if there was an error.
 	 */
-	private static int parseTimestamp(byte[] bytes, int startPos, EncapsulatedString timestamp) {
+	private static int parseTimestamp(byte[] bytes, int startPos, EncapsulatedString timestamp, String receivedTimestamp) {
 		String month = "";
 		String day = "";
 		String time = "";
@@ -143,7 +138,7 @@ public class BSDSyslogMessage {
 		
 		//fill month
 		if(pos + 3 >= bytes.length) {
-			timestamp.string = generateTimestamp();
+			timestamp.string = receivedTimestamp;
 			return -1;
 		}
 			
@@ -172,7 +167,7 @@ public class BSDSyslogMessage {
 		
 		//Check for errors
 		if(dayStart == 0 || dayEnd == 0) {
-			timestamp.string = generateTimestamp();
+			timestamp.string = receivedTimestamp;
 			return -1;
 		}
 		
@@ -201,7 +196,7 @@ public class BSDSyslogMessage {
 		
 		//Check for errors
 		if(timeStart == 0 || timeEnd == 0) {
-			timestamp.string = generateTimestamp();
+			timestamp.string = receivedTimestamp;
 			return -1;
 		}
 		
@@ -338,7 +333,7 @@ public class BSDSyslogMessage {
 		
 		//Timestamp
 		//Start with the generated one first
-		
+		bsdMessage.receivedTimestamp = generateTimestamp();
 		boolean hasTimestamp = false;
 		int timestampStart = findTimestampStart(bytes, bytePos);
 		if(timestampStart != -1) {
@@ -348,17 +343,14 @@ public class BSDSyslogMessage {
 		EncapsulatedString timestamp = new EncapsulatedString();
 		if(hasTimestamp) {
 			
-			int afterTimePosition = parseTimestamp(bytes, timestampStart, timestamp);
+			int afterTimePosition = parseTimestamp(bytes, timestampStart, timestamp, bsdMessage.receivedTimestamp);
 			if(afterTimePosition != -1)
 				bytePos = afterTimePosition;
 			
 			bsdMessage.originalTimestamp = timestamp.string;
 		} else {
-			Instant instant = Instant.now();
-			ZonedDateTime currentDateTime = ZonedDateTime.ofInstant(instant, ZoneId.systemDefault());
-			bsdMessage.originalTimestamp = 	getMonthFromNumber(currentDateTime.getMonthValue()) + " " +
-									conditionalDayPad(currentDateTime.getDayOfMonth()) + " " +
-									formatTime(currentDateTime);
+			//Use the time of reception in lieu of a self-reported timestamp
+			bsdMessage.originalTimestamp = bsdMessage.receivedTimestamp;
 		}
 		
 		//Hostname
@@ -378,10 +370,29 @@ public class BSDSyslogMessage {
 		return bsdMessage;
 	}
 	
+	public String getMessageAsString(boolean useOriginalTimestamp) {
+		if(useOriginalTimestamp) {
+			return "<" +
+				pri +
+				">" +
+				originalTimestamp + " " +
+				hostname + " " +
+				message;
+		} else {
+			return "<" +
+					pri +
+					">" +
+					receivedTimestamp + " " +
+					hostname + " " +
+					message;
+		}
+	}
+	
 	public SoffitObject serialize() {
-		SoffitObject s_message = new SoffitObject("root");
+		SoffitObject s_message = new SoffitObject("BSDSyslogMessage");
 		s_message.add(new SoffitField("PRI", String.valueOf(pri)));
-		s_message.add(new SoffitField("Timestamp", originalTimestamp));
+		s_message.add(new SoffitField("OriginalTimestamp", originalTimestamp));
+		s_message.add(new SoffitField("ReceivedTimestamp", receivedTimestamp));
 		s_message.add(new SoffitField("Hostname", hostname));
 		s_message.add(new SoffitField("Message", message));
 		
@@ -392,7 +403,8 @@ public class BSDSyslogMessage {
 		BSDSyslogMessage message = new BSDSyslogMessage();
 		
 		message.pri = Integer.parseInt(s_message.getField("PRI").getValue());
-		message.originalTimestamp = s_message.getField("Timestamp").getValue();
+		message.originalTimestamp = s_message.getField("OriginalTimestamp").getValue();
+		message.receivedTimestamp = s_message.getField("ReceivedTimestamp").getValue();
 		message.hostname = s_message.getField("Hostname").getValue();
 		message.message = s_message.getField("Message").getValue();
 		

@@ -25,7 +25,7 @@ public class DumbSyslogServer {
 	
 	ServerSocket interfaceSocket = null;
 	boolean allowSubscribers = false;
-	boolean disregardReportedTimestamp = false;
+	boolean disregardTimestamp = false;
 	String logStorageLocation;
 	int logStorageHours;
 	int messageBufferCount;
@@ -33,16 +33,17 @@ public class DumbSyslogServer {
 	LogFileManager logFileManager;
 	Thread logFileManagerThread;
 	volatile SyslogMessageBuffer syslogBuffer;
-	SyslogHandler handler;
+	SyslogHandler syslogHandler;
 	Thread syslogHandlerThread;
 	
-	volatile ArrayList<SyslogSubscriber> subscribers;
+	SubscriberHandler subscriberHandler;
+	Thread subscriberHandlerThread;
 	
-	public DumbSyslogServer(int syslogPort, int interfacePort, boolean disregardReportedTimestamp, String logStorageLocation, int localLogStorageTimeHours, int messageBufferCount) throws IOException {
+	public DumbSyslogServer(int syslogPort, int interfacePort, boolean disregardTimestamp, String logStorageLocation, int localLogStorageTimeHours, int messageBufferCount) throws IOException {
 		syslogSocket = new DatagramSocket(syslogPort);
 		packetBuffer = new byte[1024 * 1024];
 		syslogPacket = new DatagramPacket(packetBuffer, packetBuffer.length);
-		this.disregardReportedTimestamp = disregardReportedTimestamp;
+		this.disregardTimestamp = disregardTimestamp;
 		this.logStorageLocation = logStorageLocation;
 		this.logStorageHours = localLogStorageTimeHours;
 		this.messageBufferCount = messageBufferCount;
@@ -53,26 +54,28 @@ public class DumbSyslogServer {
 				logStorageLocation += '/';
 		}
 		
-		if(interfacePort != 0) {
+		if(interfacePort != 0)
 			allowSubscribers = true;
-			interfaceSocket = new ServerSocket(interfacePort);
-		}
 		
 		syslogBuffer = new SyslogMessageBuffer(messageBufferCount);
-		subscribers = new ArrayList<>();
-		logFileManager = new LogFileManager(localLogStorageTimeHours, logStorageLocation);
-		handler = new SyslogHandler(syslogBuffer, subscribers, logFileManager);
+		subscriberHandler = new SubscriberHandler(interfacePort, syslogBuffer);
+		logFileManager = new LogFileManager(localLogStorageTimeHours, logStorageLocation, disregardTimestamp);
+		syslogHandler = new SyslogHandler(syslogBuffer, subscriberHandler, logFileManager);
 	}
 	
 	public void mainLoop() throws IOException {
-		syslogHandlerThread = Thread.ofPlatform().start(handler);
+		syslogHandlerThread = Thread.ofPlatform().start(syslogHandler);
 		logFileManagerThread = Thread.ofPlatform().start(logFileManager);
+		if(allowSubscribers)
+			subscriberHandlerThread = Thread.ofVirtual().start(subscriberHandler);
+		
+		System.out.println("DumbSyslogServer magic in the form of three platform threads and one virtual thread has started...");
 		
 		while(true) {
 			syslogSocket.receive(syslogPacket);
 			SyslogData data = new SyslogData(syslogPacket);
-			handler.dataQueue.push(data);
-			handler.awaken();
+			syslogHandler.dataQueue.push(data);
+			syslogHandler.awaken();
 		}
 	}
 	
@@ -106,17 +109,15 @@ public class DumbSyslogServer {
 
 class SyslogHandler implements Runnable {
 	
-	int fileCount = 0;
 	volatile ArrayDeque<SyslogData> dataQueue;
 	volatile SyslogMessageBuffer syslogBuffer;
-	volatile ArrayList<SyslogSubscriber> subscribers;
-	boolean storeLogs;
+	SubscriberHandler subscriberHandler;
 	LogFileManager logFileManager;
 	
-	public SyslogHandler(SyslogMessageBuffer syslogBuffer, ArrayList<SyslogSubscriber> subscribers, LogFileManager logFileManager) throws FileNotFoundException {
+	public SyslogHandler(SyslogMessageBuffer syslogBuffer, SubscriberHandler subscriberHandler, LogFileManager logFileManager) throws FileNotFoundException {
 		this.syslogBuffer = syslogBuffer;
 		dataQueue = new ArrayDeque<>();
-		this.subscribers = subscribers;
+		this.subscriberHandler = subscriberHandler;
 		this.logFileManager = logFileManager;
 	}
 	
@@ -134,20 +135,17 @@ class SyslogHandler implements Runnable {
 			BSDSyslogMessage syslogMessage = BSDSyslogMessage.parseMessage(data.data, data.address);
 			syslogBuffer.addMessage(syslogMessage);
 			
-			for(int i = 0; i < subscribers.size(); i++) {
-				//What happens when this hangs?
-				//Extra assurance if a subscribers gets removed mid push
-				if(i < subscribers.size())
-					subscribers.get(i).pushMessage(syslogMessage);
-			}
+			subscriberHandler.pushMessage(syslogMessage);
 			
 			logFileManager.writeLog(syslogMessage, data);
 			
+			/*
 			System.out.println(syslogMessage.pri);
 			System.out.println(syslogMessage.originalTimestamp);
 			System.out.println(syslogMessage.hostname);
 			System.out.println(syslogMessage.message);
 			System.out.println();
+			*/
 		}
 		
 		try {
@@ -187,16 +185,45 @@ class SyslogMessageBuffer {
 		if(buffer.size() > bufferSize)
 			buffer.removeLast();
 	}
+	
+	public ArrayDeque<BSDSyslogMessage> getCopyOfBuffer() {
+		return buffer.clone();
+	}
+}
+
+class SyslogSubscriber {
+	
+	Socket socket;
+	SubscriberHandler handler;
+	
+	public SyslogSubscriber(Socket socket, SubscriberHandler handler) {
+		this.socket = socket;
+		this.handler = handler;
+	}
+	
+	public void pushMessage(BSDSyslogMessage message) {
+		SoffitObject s_message = new SoffitObject("root");
+		s_message.add(message.serialize());
+		
+		try {
+			SoffitUtil.WriteStream(s_message, socket.getOutputStream());
+		} catch (IOException e) {
+			//Remove from the subscriber list if there are any issues
+			handler.subscribers.remove(this);
+		}
+	}
 }
 
 class SubscriberHandler implements Runnable {
 
-	volatile ArrayList<SyslogSubscriber> subscribers;
+	public volatile ArrayList<SyslogSubscriber> subscribers;
 	ServerSocket ss;
+	SyslogMessageBuffer buffer;
 	
-	public SubscriberHandler(int interfacePort, ArrayList<SyslogSubscriber> subscribers) throws IOException {
+	public SubscriberHandler(int interfacePort, SyslogMessageBuffer buffer) throws IOException {
 		ss = new ServerSocket(interfacePort);
-		this.subscribers = subscribers;
+		subscribers = new ArrayList<>();
+		this.buffer = buffer;
 	}
 	
 	@Override
@@ -204,9 +231,25 @@ class SubscriberHandler implements Runnable {
 		while(true) {
 			try {
 				Socket socket = ss.accept();
-				SyslogSubscriber subscriber = new SyslogSubscriber(socket);
+				SyslogSubscriber subscriber = new SyslogSubscriber(socket, this);
 				subscribers.add(subscriber);
-			} catch (IOException e) {}
+				
+				//Relay the current buffer to the subscriber
+				Thread.ofVirtual().start(() -> {
+					ArrayDeque<BSDSyslogMessage> bufferedMessages = buffer.getCopyOfBuffer();
+					while(!bufferedMessages.isEmpty()) {
+						subscriber.pushMessage(bufferedMessages.poll());
+					}
+				});
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+	
+	public void pushMessage(BSDSyslogMessage message) {
+		for(int i = 0; i < subscribers.size(); i++) {
+			subscribers.get(i).pushMessage(message);
 		}
 	}
 }
@@ -218,8 +261,9 @@ class LogFileManager implements Runnable {
 	long maxStorageTimeMillis;
 	String logStorageLocation;
 	boolean storeLogs;
+	boolean disregardTimestamp;
 	
-	public LogFileManager(int logStorageHours, String logStorageLocation) {
+	public LogFileManager(int logStorageHours, String logStorageLocation, boolean disregardTimestamp) {
 		knownFiles = new ArrayList<>();
 		knownDirs = new ArrayList<>();
 		this.logStorageHours = logStorageHours;
@@ -227,6 +271,7 @@ class LogFileManager implements Runnable {
 		//maxStorageTimeMillis = logStorageHours * 1000;
 		this.logStorageLocation = logStorageLocation;
 		storeLogs = !logStorageLocation.isEmpty();
+		this.disregardTimestamp = disregardTimestamp;
 		
 		scanForLogs();
 	}
@@ -268,27 +313,37 @@ class LogFileManager implements Runnable {
 	}
 	
 	public void writeLog(BSDSyslogMessage syslogMessage, SyslogData data) {
+		//Don't write logs if not storing
 		if(!storeLogs)
 			return;
 
-		if(!hasDir(Path.of(logStorageLocation + syslogMessage.hostname))) {
+		Path logDirPath = Path.of(logStorageLocation + syslogMessage.hostname);
+		if(!hasDir(logDirPath)) {
 			try {
-				if(!java.nio.file.Files.exists(Path.of(logStorageLocation + syslogMessage.hostname)))
-					java.nio.file.Files.createDirectories(Path.of(logStorageLocation + syslogMessage.hostname));
+				if(!java.nio.file.Files.exists(logDirPath))
+					java.nio.file.Files.createDirectories(logDirPath);
 				
-				knownDirs.add(Path.of(logStorageLocation + syslogMessage.hostname));
+				knownDirs.add(logDirPath);
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
 		}
 		
 		try {
-			String fileName = logStorageLocation + syslogMessage.hostname + "/" + syslogMessage.getFileFriendlyTimestamp();
+			String fileName = null;
+			if(disregardTimestamp)
+				fileName = logStorageLocation + syslogMessage.hostname + "/" + SyslogUtils.getFileFriendlyTimestamp(syslogMessage.receivedTimestamp);
+			else
+				fileName = logStorageLocation + syslogMessage.hostname + "/" + SyslogUtils.getFileFriendlyTimestamp(syslogMessage.originalTimestamp);
+			
 			FileOutputStream fos = new FileOutputStream(fileName, true);
 			fos.write(data.data);
 			fos.write((int) '\n');
 			fos.close();
 			knownFiles.add(new LogFile(Path.of(fileName), System.currentTimeMillis()));
+		} catch(FileNotFoundException e) {
+			//Somebody/something might've cleaned up the directories.
+			knownDirs.remove(logDirPath);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

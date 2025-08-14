@@ -1,6 +1,6 @@
 __SoffitStart
 
-#log storage location suggestions.  The choice is ultimately up to you.
+#Log storage location suggestions.  The choice is ultimately up to you.
 #Feel free to uncomment whichever matches your system, or modify to your liking
 #If no storage location is specified, syslog messages will only be stored in memory.
 #LogStorageLocation "/var/DumbSyslogServer/logs"
@@ -11,15 +11,15 @@ LogStorageLocation "./logs"
 #514 is the standard port 
 SyslogPort "514"
 
-#Uncomment this to re-timestamp syslog messages based on the time this server received the messages.
-#The raw log files that are saved will still have the self-reported timestamp.
+#Uncomment this to save syslog messages based on the time this server received the messages.
+#The data inside the file will always have the self-reported timestamp, if available.
 #Badly formatted syslog messages will always have a generated timestamp based on when the message was received.
 #DisregardTimestamp "True"
 
 #The TCP port on which a user interface will connect on.
 #Default recommended port is 54321.
 #If no port is specified then no compliant user interfaces can connect.
-#InterfacePort "54321"
+InterfacePort "54321"
 
 #How many hours logs will be stored on this device.
 #A value of 0 indicates permanent until manually deleted

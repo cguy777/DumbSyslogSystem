@@ -33,4 +33,9 @@ public class SyslogUtils {
 		
 		return true;
 	}
+	
+	public static String getFileFriendlyTimestamp(String timestamp) {
+		String friendlyTimestamp = timestamp.replace(':', '-');
+		return friendlyTimestamp;
+	}
 }
