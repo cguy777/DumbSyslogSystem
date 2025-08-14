@@ -10,7 +10,14 @@ import fibrous.soffit.SoffitField;
 
 public class BSDSyslogMessage {
 	public int pri;
-	public String timestamp;
+	/**
+	 * The timestamp that was reported by the device that sent the message
+	 */
+	public String originalTimestamp;
+	/**
+	 * A generated timestamp that is based on when the message was actually received
+	 */
+	public String receivedTimestamp;
 	public String hostname;
 	public String message;
 
@@ -116,7 +123,7 @@ public class BSDSyslogMessage {
 	}
 	
 	public String getFileFriendlyTimestamp() {
-		String friendlyTimestamp = timestamp.replace(':', '-');
+		String friendlyTimestamp = originalTimestamp.replace(':', '-');
 		return friendlyTimestamp;
 	}
 	
@@ -330,6 +337,8 @@ public class BSDSyslogMessage {
 		bsdMessage.pri = parsedPRI.integer;
 		
 		//Timestamp
+		//Start with the generated one first
+		
 		boolean hasTimestamp = false;
 		int timestampStart = findTimestampStart(bytes, bytePos);
 		if(timestampStart != -1) {
@@ -343,11 +352,11 @@ public class BSDSyslogMessage {
 			if(afterTimePosition != -1)
 				bytePos = afterTimePosition;
 			
-			bsdMessage.timestamp = timestamp.string;
+			bsdMessage.originalTimestamp = timestamp.string;
 		} else {
 			Instant instant = Instant.now();
 			ZonedDateTime currentDateTime = ZonedDateTime.ofInstant(instant, ZoneId.systemDefault());
-			bsdMessage.timestamp = 	getMonthFromNumber(currentDateTime.getMonthValue()) + " " +
+			bsdMessage.originalTimestamp = 	getMonthFromNumber(currentDateTime.getMonthValue()) + " " +
 									conditionalDayPad(currentDateTime.getDayOfMonth()) + " " +
 									formatTime(currentDateTime);
 		}
@@ -372,7 +381,7 @@ public class BSDSyslogMessage {
 	public SoffitObject serialize() {
 		SoffitObject s_message = new SoffitObject("root");
 		s_message.add(new SoffitField("PRI", String.valueOf(pri)));
-		s_message.add(new SoffitField("Timestamp", timestamp));
+		s_message.add(new SoffitField("Timestamp", originalTimestamp));
 		s_message.add(new SoffitField("Hostname", hostname));
 		s_message.add(new SoffitField("Message", message));
 		
@@ -383,7 +392,7 @@ public class BSDSyslogMessage {
 		BSDSyslogMessage message = new BSDSyslogMessage();
 		
 		message.pri = Integer.parseInt(s_message.getField("PRI").getValue());
-		message.timestamp = s_message.getField("Timestamp").getValue();
+		message.originalTimestamp = s_message.getField("Timestamp").getValue();
 		message.hostname = s_message.getField("Hostname").getValue();
 		message.message = s_message.getField("Message").getValue();
 		

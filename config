@@ -11,6 +11,11 @@ LogStorageLocation "./logs"
 #514 is the standard port 
 SyslogPort "514"
 
+#Uncomment this to re-timestamp syslog messages based on the time this server received the messages.
+#The raw log files that are saved will still have the self-reported timestamp.
+#Badly formatted syslog messages will always have a generated timestamp based on when the message was received.
+#DisregardTimestamp "True"
+
 #The TCP port on which a user interface will connect on.
 #Default recommended port is 54321.
 #If no port is specified then no compliant user interfaces can connect.

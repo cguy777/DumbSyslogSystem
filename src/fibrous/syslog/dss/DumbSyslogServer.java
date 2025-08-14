@@ -25,21 +25,24 @@ public class DumbSyslogServer {
 	
 	ServerSocket interfaceSocket = null;
 	boolean allowSubscribers = false;
+	boolean disregardReportedTimestamp = false;
 	String logStorageLocation;
 	int logStorageHours;
 	int messageBufferCount;
 	
 	LogFileManager logFileManager;
+	Thread logFileManagerThread;
 	volatile SyslogMessageBuffer syslogBuffer;
 	SyslogHandler handler;
 	Thread syslogHandlerThread;
 	
 	volatile ArrayList<SyslogSubscriber> subscribers;
 	
-	public DumbSyslogServer(int syslogPort, int interfacePort, String logStorageLocation, int localLogStorageTimeHours, int messageBufferCount) throws IOException {
+	public DumbSyslogServer(int syslogPort, int interfacePort, boolean disregardReportedTimestamp, String logStorageLocation, int localLogStorageTimeHours, int messageBufferCount) throws IOException {
 		syslogSocket = new DatagramSocket(syslogPort);
 		packetBuffer = new byte[1024 * 1024];
 		syslogPacket = new DatagramPacket(packetBuffer, packetBuffer.length);
+		this.disregardReportedTimestamp = disregardReportedTimestamp;
 		this.logStorageLocation = logStorageLocation;
 		this.logStorageHours = localLogStorageTimeHours;
 		this.messageBufferCount = messageBufferCount;
@@ -63,6 +66,7 @@ public class DumbSyslogServer {
 	
 	public void mainLoop() throws IOException {
 		syslogHandlerThread = Thread.ofPlatform().start(handler);
+		logFileManagerThread = Thread.ofPlatform().start(logFileManager);
 		
 		while(true) {
 			syslogSocket.receive(syslogPacket);
@@ -73,24 +77,16 @@ public class DumbSyslogServer {
 	}
 	
 	public static void main(String[]args) throws IOException {
-		/*
-		FileInputStream fis = new FileInputStream("save_cisco.dump");
-		
-		byte[] bytes = fis.readAllBytes();
-		BSDSyslogMessage syslogMessage = BSDSyslogMessage.parseMessage(bytes, InetAddress.getLoopbackAddress());
-		System.out.println(syslogMessage.pri);
-		System.out.println(syslogMessage.timestamp);
-		System.out.println(syslogMessage.hostname);
-		System.out.println(syslogMessage.message);
-		
-		fis.close();
-		*/
-		
+		//Load config
 		FileInputStream configStream = new FileInputStream("config");
 		SoffitObject s_config = SoffitUtil.ReadStream(configStream);
 		configStream.close();
 		
 		int syslogPort = Integer.parseInt(s_config.getField("SyslogPort").getValue());
+		
+		boolean disregardTimestamp = false;
+		if(s_config.hasField("DisregardTimestamp"))
+			disregardTimestamp = Boolean.parseBoolean(s_config.getField("DisregardTimestamp").getValue());
 		
 		int interfacePort = 0;
 		if(s_config.hasField("InterfacePort"))
@@ -103,7 +99,7 @@ public class DumbSyslogServer {
 		int logStorageHours = Integer.parseInt(s_config.getField("LogStorageHours").getValue());
 		int messageBufferCount = Integer.parseInt(s_config.getField("MessageBufferCount").getValue());
 		
-		DumbSyslogServer server = new DumbSyslogServer(syslogPort, interfacePort, logStorageLocation, logStorageHours, messageBufferCount);
+		DumbSyslogServer server = new DumbSyslogServer(syslogPort, interfacePort, disregardTimestamp, logStorageLocation, logStorageHours, messageBufferCount);
 		server.mainLoop();
 	}
 }
@@ -148,7 +144,7 @@ class SyslogHandler implements Runnable {
 			logFileManager.writeLog(syslogMessage, data);
 			
 			System.out.println(syslogMessage.pri);
-			System.out.println(syslogMessage.timestamp);
+			System.out.println(syslogMessage.originalTimestamp);
 			System.out.println(syslogMessage.hostname);
 			System.out.println(syslogMessage.message);
 			System.out.println();
@@ -228,6 +224,7 @@ class LogFileManager implements Runnable {
 		knownDirs = new ArrayList<>();
 		this.logStorageHours = logStorageHours;
 		maxStorageTimeMillis = logStorageHours * 60 * 60 * 1000;
+		//maxStorageTimeMillis = logStorageHours * 1000;
 		this.logStorageLocation = logStorageLocation;
 		storeLogs = !logStorageLocation.isEmpty();
 		
