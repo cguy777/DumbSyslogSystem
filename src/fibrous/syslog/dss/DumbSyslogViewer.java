@@ -38,7 +38,7 @@ public class DumbSyslogViewer {
 	}
 	
 	public static void main(String[]args) throws SoffitException, IOException {
-		DumbSyslogViewer client = new DumbSyslogViewer(InetAddress.getByName("127.0.0.1"), 54321);
+		DumbSyslogViewer client = new DumbSyslogViewer(InetAddress.getByName("10.0.50.118"), 54321);
 		
 		while(true) {
 			client.receiveData();
