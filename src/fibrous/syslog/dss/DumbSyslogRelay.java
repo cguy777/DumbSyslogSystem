@@ -11,11 +11,14 @@ public class DumbSyslogRelay {
     DatagramPacket inPacket;
     DatagramPacket outPacket;
     InetAddress remoteAddress;
+    
+    int forwardedPort;
 
     public DumbSyslogRelay(InetAddress toAddress, int port) throws IOException {
         inputSocket = new DatagramSocket(port);
         outputSocket = new DatagramSocket();
         remoteAddress = toAddress;
+        forwardedPort = port;
     }
 
     public void processTraffic() throws IOException {
@@ -29,9 +32,11 @@ public class DumbSyslogRelay {
         BSDSyslogMessage message = BSDSyslogMessage.parseMessage(trimmedBuffer, inPacket.getAddress());
         
         message.message = "(RELAYED - ORIGIN:" + message.hostname + ") " + message.message;
+        trimmedBuffer = message.getMessageAsString(true).getBytes();
         
         outPacket = new DatagramPacket(trimmedBuffer, trimmedBuffer.length);
         outPacket.setAddress(remoteAddress);
+        outPacket.setPort(forwardedPort);
         outputSocket.send(outPacket);
     }
 

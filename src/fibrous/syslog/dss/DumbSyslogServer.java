@@ -238,7 +238,7 @@ class SubscriberHandler implements Runnable {
 				Thread.ofVirtual().start(() -> {
 					ArrayDeque<BSDSyslogMessage> bufferedMessages = buffer.getCopyOfBuffer();
 					while(!bufferedMessages.isEmpty()) {
-						subscriber.pushMessage(bufferedMessages.poll());
+						subscriber.pushMessage(bufferedMessages.pollLast());
 					}
 				});
 			} catch (IOException e) {
