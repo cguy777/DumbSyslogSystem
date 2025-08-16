@@ -34,7 +34,7 @@ public class CLIRemoveFilter extends FiCommand {
 			if(arguments.get(0).equals("all")) {
 				filterManager.clearFilters();
 				ios.clearFilterEditor();
-				ios.printToFilterEditor(SoffitUtil.WriteStreamToString(filterManager.serializeFilters()));
+				ios.printToFilterEditor(SoffitUtil.WriteStreamToString(filterManager.serializeAllFilters()));
 				return;
 			}
 			
@@ -48,6 +48,6 @@ public class CLIRemoveFilter extends FiCommand {
 			filterManager.removeFilter(i);
 		
 		ios.clearFilterEditor();
-		ios.printToFilterEditor(SoffitUtil.WriteStreamToString(filterManager.serializeFilters()));
+		ios.printToFilterEditor(SoffitUtil.WriteStreamToString(filterManager.serializeAllFilters()));
 	}
 }

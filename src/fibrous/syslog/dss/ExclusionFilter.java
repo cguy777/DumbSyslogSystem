@@ -15,7 +15,7 @@ public class ExclusionFilter implements SyslogFilter {
 	}
 	
 	@Override
-	public boolean testMessage(BSDSyslogMessage message) {
+	public boolean evaluateMessage(BSDSyslogMessage message) {
 		return !message.message.contains(sequence);
 	}
 	

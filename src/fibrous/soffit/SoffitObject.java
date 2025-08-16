@@ -342,12 +342,31 @@ public class SoffitObject {
 	}
 	
 	/**
+	 * Adds a SoffitObject as a child object at a specified index.
+	 * @param object
+	 */
+	public void add(SoffitObject object, int index) {
+		object.setParent(this);
+		objects.add(index, object);
+	}
+	
+	/**
 	 * Adds a SoffitField to this object.
 	 * @param field
 	 */
 	public void add(SoffitField field) {
 		field.setParent(this);
 		fields.add(field);
+	}
+	
+	/**
+	 * Adds a SoffitField as a specified index
+	 * @param field
+	 * @param index
+	 */
+	public void add(SoffitField field, int index) {
+		field.setParent(this);
+		fields.add(index, field);
 	}
 	
 	/**

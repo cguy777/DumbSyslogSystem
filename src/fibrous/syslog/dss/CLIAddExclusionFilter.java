@@ -4,6 +4,8 @@ import java.util.ArrayList;
 
 import fibrous.ficli.FiCommand;
 import fibrous.ficli.FiOutputStream;
+import fibrous.soffit.SoffitField;
+import fibrous.soffit.SoffitObject;
 import fibrous.soffit.SoffitUtil;
 
 public class CLIAddExclusionFilter extends FiCommand {
@@ -27,9 +29,13 @@ public class CLIAddExclusionFilter extends FiCommand {
 		}
 		
 		String sequence = arguments.get(0);
-		filterManager.addFilter(new ExclusionFilter(sequence));
+		
+		SoffitObject s_filter = new SoffitObject("Exclusion");
+		s_filter.add(new SoffitField("sequence", sequence));
+		
+		filterManager.addFilter(s_filter);
 		
 		ios.clearFilterEditor();
-		ios.printToFilterEditor(SoffitUtil.WriteStreamToString(filterManager.serializeFilters()));
+		ios.printToFilterEditor(SoffitUtil.WriteStreamToString(filterManager.serializeAllFilters()));
 	}
 }

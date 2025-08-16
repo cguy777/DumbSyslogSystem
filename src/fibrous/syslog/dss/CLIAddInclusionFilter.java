@@ -4,6 +4,8 @@ import java.util.ArrayList;
 
 import fibrous.ficli.FiCommand;
 import fibrous.ficli.FiOutputStream;
+import fibrous.soffit.SoffitObject;
+import fibrous.soffit.SoffitField;
 import fibrous.soffit.SoffitUtil;
 
 public class CLIAddInclusionFilter extends FiCommand {
@@ -25,10 +27,14 @@ public class CLIAddInclusionFilter extends FiCommand {
 			ios.println("Syntax error: must include a sequence to include");
 		
 		String sequence = arguments.get(0);
-		filterManager.addFilter(new InclusionFilter(sequence));
+		
+		SoffitObject s_filter = new SoffitObject("Inclusion");
+		s_filter.add(new SoffitField("sequence", sequence));
+		
+		filterManager.addFilter(s_filter);
 		
 		ios.clearFilterEditor();
-		ios.printToFilterEditor(SoffitUtil.WriteStreamToString(filterManager.serializeFilters()));
+		ios.printToFilterEditor(SoffitUtil.WriteStreamToString(filterManager.serializeAllFilters()));
 		ios.showTab(1);
 	}
 }

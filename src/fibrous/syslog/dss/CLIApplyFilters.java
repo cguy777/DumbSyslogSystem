@@ -1,6 +1,7 @@
 package fibrous.syslog.dss;
 
 import fibrous.ficli.FiCommand;
+import fibrous.soffit.SoffitUtil;
 import fibrous.syslog.dss.DumbSyslogViewer.MessageHandler;
 
 public class CLIApplyFilters extends FiCommand {
@@ -20,6 +21,12 @@ public class CLIApplyFilters extends FiCommand {
 
 	@Override
 	public void execute() {
+		filterManager.setFiltersFromText(ios.console.filterEditor.getText());
+		filterManager.applyFilters();
+		
+		ios.clearFilterEditor();
+		ios.printToFilterEditor(SoffitUtil.WriteStreamToString(filterManager.serializeActiveFilters()));
+		
 		ios.clearLogs();
 		messageHandler.resetConnection();
 		
