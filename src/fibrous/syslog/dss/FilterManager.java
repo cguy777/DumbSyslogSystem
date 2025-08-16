@@ -45,6 +45,7 @@ public class FilterManager {
 			//This number field that is inserted has no bearing on the logical processing
 			//of filters and is only there for labeling purposes for the user
 			s_filter.fields.add(0, new SoffitField("number", String.valueOf(i)));
+			s_filters.add(s_filter);
 		}
 		
 		return s_filters;

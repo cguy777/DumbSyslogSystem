@@ -56,16 +56,11 @@ public class DumbSyslogViewer {
 		cli.addCommand(new CLIAddInclusionFilter("inc msg seq", filterManager, ios));
 		cli.addCommand(new CLIAddExclusionFilter("exc msg seq", filterManager, ios));
 		cli.addCommand(new CLIRemoveFilter("rem", filterManager, ios));
-		cli.addCommand(new CLIApplyFilters("apply", filterManager, messageHandler, console));
+		cli.addCommand(new CLIApplyFilters("apply", filterManager, messageHandler, ios));
+		cli.addCommand(new CLIClearConsole("clear console", ios));
 		
 		console.enterButton.addActionListener(new DoCLIAction(cli, socket));
 		console.input.addKeyListener(new DoCLIAction(cli, socket));
-		
-		try {
-			socket = new Socket(serverAddress, serverInterfacePort);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
 	}
 	
 	public void receiveData() {
@@ -120,7 +115,7 @@ public class DumbSyslogViewer {
 			if(s_encapedObject.getType().equals("BSDSyslogMessage")) {
 				BSDSyslogMessage message = BSDSyslogMessage.deserialize(s_encapedObject);
 				if(filterManager.evaluateMessage(message))
-					console.printLineToLog(message.getMessageAsFormattedString(true));
+					console.printLineToLog(message.getMessageAsFormattedString(false));
 			}
 		}
 	}

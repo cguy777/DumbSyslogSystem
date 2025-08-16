@@ -7,20 +7,22 @@ public class CLIApplyFilters extends FiCommand {
 	
 	FilterManager filterManager;
 	MessageHandler messageHandler;
-	FiGUIConsole console;
+	GUIIOStream ios;
 
-	public CLIApplyFilters(String commandString, FilterManager filterManager, MessageHandler messageHandler, FiGUIConsole console) {
+	public CLIApplyFilters(String commandString, FilterManager filterManager, MessageHandler messageHandler, GUIIOStream ios) {
 		super(commandString);
 		this.filterManager = filterManager;
 		this.messageHandler = messageHandler;
-		this.console = console;
+		this.ios = ios;
 		
 		this.commandDescription = "Reloads the logs with the current filters applied.  Usage: apply";
 	}
 
 	@Override
 	public void execute() {
-		console.clearConsoleLog();
+		ios.clearLogs();
 		messageHandler.resetConnection();
+		
+		ios.showTab(0);
 	}
 }

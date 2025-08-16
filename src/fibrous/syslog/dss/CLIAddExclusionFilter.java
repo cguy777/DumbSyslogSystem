@@ -4,16 +4,17 @@ import java.util.ArrayList;
 
 import fibrous.ficli.FiCommand;
 import fibrous.ficli.FiOutputStream;
+import fibrous.soffit.SoffitUtil;
 
 public class CLIAddExclusionFilter extends FiCommand {
 	
 	FilterManager filterManager;
-	FiOutputStream fos;
+	GUIIOStream ios;
 
-	public CLIAddExclusionFilter(String commandString, FilterManager filterManager, FiOutputStream fos) {
+	public CLIAddExclusionFilter(String commandString, FilterManager filterManager, GUIIOStream ios) {
 		super(commandString);
 		this.filterManager = filterManager;
-		this.fos = fos;
+		this.ios = ios;
 		
 		this.commandDescription = "Adds a log message exclusion filter.  Usage: exc msg seq \"sequence of characters in quotations or a single word without\"";
 	}
@@ -21,11 +22,14 @@ public class CLIAddExclusionFilter extends FiCommand {
 	@Override
 	public void execute() {
 		if(arguments.size() < 1) {
-			fos.println("Syntax error: must include a sequence to exclude");
+			ios.println("Syntax error: must include a sequence to exclude");
 			return;
 		}
 		
 		String sequence = arguments.get(0);
 		filterManager.addFilter(new ExclusionFilter(sequence));
+		
+		ios.clearFilterEditor();
+		ios.printToFilterEditor(SoffitUtil.WriteStreamToString(filterManager.serializeFilters()));
 	}
 }

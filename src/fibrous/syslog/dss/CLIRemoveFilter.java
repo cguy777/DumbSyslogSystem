@@ -4,16 +4,17 @@ import java.util.ArrayList;
 
 import fibrous.ficli.FiCommand;
 import fibrous.ficli.FiOutputStream;
+import fibrous.soffit.SoffitUtil;
 
 public class CLIRemoveFilter extends FiCommand {
 
 	FilterManager filterManager;
-	FiOutputStream fos;
+	GUIIOStream ios;
 	
-	public CLIRemoveFilter(String commandString, FilterManager filterManager, FiOutputStream fos) {
+	public CLIRemoveFilter(String commandString, FilterManager filterManager, GUIIOStream ios) {
 		super(commandString);
 		this.filterManager = filterManager;
-		this.fos = fos;
+		this.ios = ios;
 		
 		this.commandDescription = "Removes a filter.  Usage: remove [filter number or \"all\"]";
 	}
@@ -21,7 +22,7 @@ public class CLIRemoveFilter extends FiCommand {
 	@Override
 	public void execute() {
 		if(arguments.size() < 1) {
-			fos.println("Syntax error: must include the filter number to remove");
+			ios.println("Syntax error: must include the filter number to remove");
 			return;
 		}
 		
@@ -32,16 +33,21 @@ public class CLIRemoveFilter extends FiCommand {
 			
 			if(arguments.get(0).equals("all")) {
 				filterManager.clearFilters();
+				ios.clearFilterEditor();
+				ios.printToFilterEditor(SoffitUtil.WriteStreamToString(filterManager.serializeFilters()));
 				return;
 			}
 			
-			fos.println("Syntax error: argument was not a number");
+			ios.println("Syntax error: argument was not a number");
 			return;
 		}
 		
 		if(i >= filterManager.filters.size())
-			fos.println("Error: rule number does not exist");
+			ios.println("Error: rule number does not exist");
 		else
 			filterManager.removeFilter(i);
+		
+		ios.clearFilterEditor();
+		ios.printToFilterEditor(SoffitUtil.WriteStreamToString(filterManager.serializeFilters()));
 	}
 }

@@ -18,12 +18,11 @@ public class FiGUIConsole extends JPanel {
 	public JScrollPane logScroll;
 	public JTextArea logOutput;
 	
-	public JPanel filterPanel;
-	public JSplitPane filterSplitPane;
+	public JSplitPane splitPane;
 	public JScrollPane filterEditorScroll;
 	public JTextArea filterEditor;
-	public JScrollPane filterEditorOutputScroll;
-	public JTextArea filterEditorOutput;
+	public JScrollPane consoleOutputScroll;
+	public JTextArea consoleOutput;
 	
 	public JLabel caret;
 	public JTextField input;
@@ -33,9 +32,11 @@ public class FiGUIConsole extends JPanel {
 	public FiGUIConsole() {
 		this.setLayout(new BorderLayout(5, 5));
 		lowerPanel = new JPanel(new BorderLayout(5, 5));
-		
+		splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
+		splitPane.setResizeWeight(0.7);
 		tabbedPane = new JTabbedPane();
-		this.add(tabbedPane);
+		this.add(splitPane);
+		splitPane.setTopComponent(tabbedPane);
 		
 		//Syslog tab
 		logOutput = new JTextArea();
@@ -46,13 +47,6 @@ public class FiGUIConsole extends JPanel {
 		logScroll.setVisible(true);
 		tabbedPane.add("Syslogs", logScroll);
 		
-		//Filter editor tab
-		filterPanel = new JPanel();
-		filterSplitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
-		filterSplitPane.setResizeWeight(0.7);
-		filterPanel.add(filterSplitPane);
-		tabbedPane.add("Filters", filterSplitPane);
-		
 		//Filter editor
 		filterEditor = new JTextArea();
 		filterEditor.setEditable(true);
@@ -60,17 +54,17 @@ public class FiGUIConsole extends JPanel {
 		filterEditor.setVisible(true);
 		filterEditorScroll = new JScrollPane(filterEditor);
 		filterEditorScroll.setVisible(true);
-		filterSplitPane.setTopComponent(filterEditorScroll);
+		tabbedPane.add("Filters", filterEditorScroll);
 		
-		//Editor output
-		filterEditorOutput = new JTextArea();
-		filterEditorOutput.setEditable(false);
-		filterEditorOutput.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
-		filterEditorOutput.setBackground(Color.lightGray);
-		filterEditorOutput.setVisible(true);
-		filterEditorOutputScroll = new JScrollPane(filterEditorOutput);
-		filterEditorOutputScroll.setVisible(true);
-		filterSplitPane.setBottomComponent(filterEditorOutputScroll);
+		//Console output
+		consoleOutput = new JTextArea();
+		consoleOutput.setEditable(false);
+		consoleOutput.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+		consoleOutput.setBackground(Color.lightGray);
+		consoleOutput.setVisible(true);
+		consoleOutputScroll = new JScrollPane(consoleOutput);
+		consoleOutputScroll.setVisible(true);
+		splitPane.setBottomComponent(consoleOutputScroll);
 		
 		//Input area
 		caret = new JLabel("Input: ");
@@ -85,7 +79,7 @@ public class FiGUIConsole extends JPanel {
 		this.add(lowerPanel, BorderLayout.SOUTH);
 	}
 	
-	public void clearConsoleLog() {
+	public void clearLog() {
 		logOutput.setText("");
 	}
 	
@@ -97,6 +91,10 @@ public class FiGUIConsole extends JPanel {
 		input.setText("");
 	}
 	
+	public void clearConsole() {
+		consoleOutput.setText("");
+	}
+	
 	public void printToLog(String text) {
 		logOutput.append(text);
 		logOutput.setCaretPosition(logOutput.getDocument().getLength());
@@ -105,5 +103,15 @@ public class FiGUIConsole extends JPanel {
 	public void printLineToLog(String text) {
 		logOutput.append(text + '\n');
 		logOutput.setCaretPosition(logOutput.getDocument().getLength());
+	}
+	
+	public void printToConsole(String text) {
+		consoleOutput.append(text);
+		consoleOutput.setCaretPosition(consoleOutput.getDocument().getLength());
+	}
+	
+	public void printLineToConsole(String text) {
+		consoleOutput.append(text + "\n");
+		consoleOutput.setCaretPosition(consoleOutput.getDocument().getLength());
 	}
 }
