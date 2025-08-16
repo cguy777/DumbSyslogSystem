@@ -32,7 +32,7 @@ public class DumbSyslogRelay {
         BSDSyslogMessage message = BSDSyslogMessage.parseMessage(trimmedBuffer, inPacket.getAddress());
         
         message.message = "(RELAYED - ORIGIN:" + message.hostname + ") " + message.message;
-        trimmedBuffer = message.getMessageAsString(true).getBytes();
+        trimmedBuffer = message.getMessageAsFormattedString(true).getBytes();
         
         outPacket = new DatagramPacket(trimmedBuffer, trimmedBuffer.length);
         outPacket.setAddress(remoteAddress);

@@ -370,7 +370,7 @@ public class BSDSyslogMessage {
 		return bsdMessage;
 	}
 	
-	public String getMessageAsString(boolean useOriginalTimestamp) {
+	public String getMessageAsFormattedString(boolean useOriginalTimestamp) {
 		if(useOriginalTimestamp) {
 			return "<" +
 				pri +

@@ -40,8 +40,8 @@ public class SoffitObject {
 	private String type;
 	private String name;
 	
-	private ArrayList<SoffitObject> objects;
-	private ArrayList<SoffitField> fields;
+	public ArrayList<SoffitObject> objects;
+	public ArrayList<SoffitField> fields;
 	
 	private int level = -1;
 	

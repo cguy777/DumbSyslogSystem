@@ -69,6 +69,9 @@ public class SoffitUtil {
 		SoffitObject root = new SoffitObject(null, null);
 		
 		String header = getLine(stream);
+		if(header == null)
+			throw new SoffitException("SOFFIT header not found.  Stream might have closed");
+		
 		if(!header.equals(SOFFIT_START))
 			throw new SoffitException("SOFFIT header not found.");
 		
