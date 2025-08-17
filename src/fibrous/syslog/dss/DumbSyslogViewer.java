@@ -10,6 +10,7 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Stack;
 
 import javax.swing.JFrame;
 
@@ -26,10 +27,13 @@ public class DumbSyslogViewer {
 	Socket socket;
 	
 	FilterManager filterManager;
-	FiGUIConsole console;
+	public static FiGUIConsole console;
 	
 	MessageHandler messageHandler;
 	Thread messageHandlerThread;
+	
+	public static Stack<String> commandHistory;
+	public static int commandHistoryIndex = 0;
 	
 	public DumbSyslogViewer(InetAddress serverAddress, int serverInterfacePort) throws IOException {
 		this.serverAddress = serverAddress;
@@ -63,6 +67,25 @@ public class DumbSyslogViewer {
 		
 		console.enterButton.addActionListener(new DoCLIAction(cli, socket));
 		console.input.addKeyListener(new DoCLIAction(cli, socket));
+		
+		commandHistory = new Stack<>();
+	}
+	
+	public static void pushCommand(String command) {
+		if(commandHistory.size() > 1) {
+			if(!commandHistory.peek().equals(command))
+				commandHistory.push(command);
+		} else {
+			commandHistory.push(command);
+		}
+	}
+	
+	public static String getCommandHistory() {
+		commandHistoryIndex = Math.clamp(commandHistoryIndex, 0, commandHistory.size());
+		if(commandHistoryIndex == commandHistory.size())
+			return "";
+		else
+			return commandHistory.get(commandHistoryIndex);
 	}
 	
 	public void receiveData() {
@@ -141,6 +164,12 @@ public class DumbSyslogViewer {
 		public void keyPressed(KeyEvent e) {
 			if(e.getKeyCode() == KeyEvent.VK_ENTER) {
 				process();
+			} else if(e.getKeyCode() == KeyEvent.VK_UP) {
+				commandHistoryIndex--;
+				console.input.setText(getCommandHistory());
+			} else if(e.getKeyCode() == KeyEvent.VK_DOWN) {
+				commandHistoryIndex++;
+				console.input.setText(getCommandHistory());
 			}
 		}
 
@@ -155,7 +184,10 @@ public class DumbSyslogViewer {
 		}
 		
 		private void process() {
+			
 			FiState cliState = cli.processCommand();
+			pushCommand(cliState.input);
+			commandHistoryIndex = commandHistory.size();
 			
 			if(cliState.state == FiState.EXIT) {
 				try {
