@@ -2,15 +2,15 @@ package fibrous.syslog.dss;
 
 import fibrous.ficli.FiCommand;
 import fibrous.soffit.SoffitUtil;
-import fibrous.syslog.dss.DumbSyslogViewer.MessageHandler;
+import fibrous.syslog.dss.DataReceiveHandler;
 
 public class CLIApplyFilters extends FiCommand {
 	
 	FilterManager filterManager;
-	MessageHandler messageHandler;
+	DataReceiveHandler messageHandler;
 	GUIIOStream ios;
 
-	public CLIApplyFilters(String commandString, FilterManager filterManager, MessageHandler messageHandler, GUIIOStream ios) {
+	public CLIApplyFilters(String commandString, FilterManager filterManager, DataReceiveHandler messageHandler, GUIIOStream ios) {
 		super(commandString);
 		this.filterManager = filterManager;
 		this.messageHandler = messageHandler;

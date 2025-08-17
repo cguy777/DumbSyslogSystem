@@ -23,11 +23,15 @@ public class CLIAddExclusionOrFilter extends FiCommand {
 
 	@Override
 	public void execute() {
-		if(arguments.size() < 1)
+		if(arguments.size() < 1) {
 			ios.println("Syntax error: must include a filter name");
+			return;
+		}
 		
-		if(arguments.size() < 2)
+		if(arguments.size() < 2) {
 			ios.println("Syntax error: must include at least one sequence");
+			return;
+		}
 		
 		SoffitObject s_filter = new SoffitObject("ExclusionOr", arguments.get(0));
 		for(int i = 1; i < arguments.size(); i++)

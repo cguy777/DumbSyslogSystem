@@ -16,7 +16,7 @@ public class CLIRemoveFilter extends FiCommand {
 		this.filterManager = filterManager;
 		this.ios = ios;
 		
-		this.commandDescription = "Removes a filter.  Usage: remove [filter number or \"all\"]";
+		this.commandDescription = "Removes a filter.  Usage: rem [filter number or \"all\"]";
 	}
 
 	@Override

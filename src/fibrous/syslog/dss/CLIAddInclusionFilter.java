@@ -23,8 +23,10 @@ public class CLIAddInclusionFilter extends FiCommand {
 
 	@Override
 	public void execute() {
-		if(arguments.size() < 1)
+		if(arguments.size() < 1) {
 			ios.println("Syntax error: must include a sequence to include");
+			return;
+		}
 		
 		String sequence = arguments.get(0);
 		

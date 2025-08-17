@@ -8,8 +8,6 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.SocketException;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Stack;
 
 import javax.swing.JFrame;
@@ -27,13 +25,11 @@ public class DumbSyslogViewer {
 	Socket socket;
 	
 	FilterManager filterManager;
-	public static FiGUIConsole console;
+	FiGUIConsole console;
+	CommandHistoryBuffer chb;
 	
-	MessageHandler messageHandler;
+	DataReceiveHandler messageHandler;
 	Thread messageHandlerThread;
-	
-	public static Stack<String> commandHistory;
-	public static int commandHistoryIndex = 0;
 	
 	public DumbSyslogViewer(InetAddress serverAddress, int serverInterfacePort) throws IOException {
 		this.serverAddress = serverAddress;
@@ -49,8 +45,9 @@ public class DumbSyslogViewer {
 		console.caret.setText(" > ");
 		frame.add(console);
 		frame.setVisible(true);
+		chb = new CommandHistoryBuffer();
 		
-		messageHandler = new DumbSyslogViewer.MessageHandler();
+		messageHandler = new DataReceiveHandler(serverAddress, serverInterfacePort, filterManager, console);
 		
 		GUIIOStream ios = new GUIIOStream(console);
 		
@@ -65,27 +62,9 @@ public class DumbSyslogViewer {
 		cli.addCommand(new CLIApplyFilters("apply", filterManager, messageHandler, ios));
 		cli.addCommand(new CLIClearConsole("clear console", ios));
 		
-		console.enterButton.addActionListener(new DoCLIAction(cli, socket));
-		console.input.addKeyListener(new DoCLIAction(cli, socket));
-		
-		commandHistory = new Stack<>();
-	}
-	
-	public static void pushCommand(String command) {
-		if(commandHistory.size() > 1) {
-			if(!commandHistory.peek().equals(command))
-				commandHistory.push(command);
-		} else {
-			commandHistory.push(command);
-		}
-	}
-	
-	public static String getCommandHistory() {
-		commandHistoryIndex = Math.clamp(commandHistoryIndex, 0, commandHistory.size());
-		if(commandHistoryIndex == commandHistory.size())
-			return "";
-		else
-			return commandHistory.get(commandHistoryIndex);
+		console.enterButton.addActionListener(new DoCLIAction(cli, console, chb));
+		console.input.addKeyListener(new DoCLIAction(cli, console, chb));
+		console.input.addKeyListener(new CycleCommandHistoryAction(console, chb));
 	}
 	
 	public void receiveData() {
@@ -97,115 +76,175 @@ public class DumbSyslogViewer {
 		
 		client.receiveData();
 	}
-	
-	class MessageHandler implements Runnable {
+}
 
-		Socket socket;
-		
-		@Override
-		public void run() {
-			while(true) {
-				try {
-					socket = new Socket(serverAddress, serverInterfacePort);
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-				
-				while(true) {
-					try {
-						receiveData();
-					} catch (SoffitException e) {
-						break;
-					} catch (SocketException e) {
-						break;
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
-				}
-			}
-		}
-		
-		public void resetConnection() {
+class DataReceiveHandler implements Runnable {
+
+	Socket socket;
+	InetAddress serverAddress;
+	int serverInterfacePort;
+	FilterManager filterManager;
+	FiGUIConsole console;
+	
+	public DataReceiveHandler(InetAddress serverAddress, int serverInterfacePort, FilterManager filterManager, FiGUIConsole console) {
+		this.serverAddress = serverAddress;
+		this.serverInterfacePort = serverInterfacePort;
+		this.filterManager = filterManager;
+		this.console = console;
+	}
+	
+	@Override
+	public void run() {
+		while(true) {
 			try {
-				socket.close();
+				socket = new Socket(serverAddress, serverInterfacePort);
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
-		}
-
-		public void receiveData() throws SoffitException, SocketException, IOException {
-			SoffitObject s_data = SoffitUtil.ReadStream(socket.getInputStream());
 			
-			SoffitObject s_encapedObject = s_data.getFirstObject();
-			if(s_encapedObject.getType().equals("BSDSyslogMessage")) {
-				BSDSyslogMessage message = BSDSyslogMessage.deserialize(s_encapedObject);
-				if(filterManager.evaluateMessage(message))
-					console.printLineToLog(message.getMessageAsFormattedString(false));
+			while(true) {
+				try {
+					receiveData();
+				} catch (SoffitException e) {
+					System.out.println("Resetting (SOFFIT)");
+					break;
+				} catch (SocketException e) {
+					System.out.println("Resetting (Socket)");
+					break;
+				} catch (IOException e) {
+					e.printStackTrace();
+					break;
+				}
 			}
 		}
 	}
 	
-	static class DoCLIAction implements ActionListener, KeyListener {
+	public void resetConnection() {
+		try {
+			socket.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void receiveData() throws SoffitException, SocketException, IOException {
+		SoffitObject s_data = SoffitUtil.ReadStream(socket.getInputStream());
 		
-		private FiCLI cli;
-		private Socket connection;
-		
-		public DoCLIAction(FiCLI cli, Socket connection) {
-			this.cli = cli;
-			this.connection = connection;
-		}
-
-		@Override
-		public void keyTyped(KeyEvent e) {
-			
-		}
-
-		@Override
-		public void keyPressed(KeyEvent e) {
-			if(e.getKeyCode() == KeyEvent.VK_ENTER) {
-				process();
-			} else if(e.getKeyCode() == KeyEvent.VK_UP) {
-				commandHistoryIndex--;
-				console.input.setText(getCommandHistory());
-			} else if(e.getKeyCode() == KeyEvent.VK_DOWN) {
-				commandHistoryIndex++;
-				console.input.setText(getCommandHistory());
-			}
-		}
-
-		@Override
-		public void keyReleased(KeyEvent e) {
-			
-		}
-
-		@Override
-		public void actionPerformed(ActionEvent e) {
-			process();
-		}
-		
-		private void process() {
-			
-			FiState cliState = cli.processCommand();
-			pushCommand(cliState.input);
-			commandHistoryIndex = commandHistory.size();
-			
-			if(cliState.state == FiState.EXIT) {
-				try {
-					connection.close();
-					System.exit(0);
-				} catch (IOException ex) {
-					
-				}
-			}
-			
-			//Just ignore empty input
-			if(cliState.input.length() == 0)
-				return;
-			
-			if(cliState.state == FiState.INVALID) {
-				cli.getOutputStream().println("INVALID INPUT: " + cliState.input);
-			}
+		SoffitObject s_encapedObject = s_data.getFirstObject();
+		if(s_encapedObject.getType().equals("BSDSyslogMessage")) {
+			BSDSyslogMessage message = BSDSyslogMessage.deserialize(s_encapedObject);
+			if(filterManager.evaluateMessage(message))
+				console.printLineToLog(message.getMessageAsFormattedString(false));
 		}
 	}
 }
 
+class DoCLIAction implements ActionListener, KeyListener {
+	
+	private FiCLI cli;
+	FiGUIConsole console;
+	CommandHistoryBuffer chb;
+	
+	public DoCLIAction(FiCLI cli, FiGUIConsole console, CommandHistoryBuffer chb) {
+		this.cli = cli;
+		this.console = console;
+		this.chb = chb;
+	}
+
+	@Override
+	public void keyTyped(KeyEvent e) {
+		
+	}
+
+	@Override
+	public void keyPressed(KeyEvent e) {
+		if(e.getKeyCode() == KeyEvent.VK_ENTER) {
+			process();
+		}
+	}
+
+	@Override
+	public void keyReleased(KeyEvent e) {
+		
+	}
+
+	@Override
+	public void actionPerformed(ActionEvent e) {
+		process();
+	}
+	
+	private void process() {
+		
+		FiState cliState = cli.processCommand();
+		chb.pushCommand(cliState.input);
+		
+		if(cliState.state == FiState.EXIT) {
+			System.exit(0);
+		}
+		
+		//Just ignore empty input
+		if(cliState.input.length() == 0)
+			return;
+		
+		if(cliState.state == FiState.INVALID) {
+			cli.getOutputStream().println("INVALID INPUT: " + cliState.input);
+		}
+	}
+}
+
+class CycleCommandHistoryAction implements KeyListener {
+	
+	CommandHistoryBuffer chb;
+	FiGUIConsole console;
+	
+	public CycleCommandHistoryAction(FiGUIConsole console, CommandHistoryBuffer chb) {
+		this.chb = chb;
+		this.console = console;
+	}
+
+	@Override
+	public void keyTyped(KeyEvent e) {}
+
+	@Override
+	public void keyPressed(KeyEvent e) {
+		if(e.getKeyCode() == KeyEvent.VK_UP) {
+			chb.commandHistoryIndex--;
+			console.input.setText(chb.getCommandHistory());
+		} else if(e.getKeyCode() == KeyEvent.VK_DOWN) {
+			chb.commandHistoryIndex++;
+			console.input.setText(chb.getCommandHistory());
+		}
+	}
+
+	@Override
+	public void keyReleased(KeyEvent e) {}
+	
+}
+
+class CommandHistoryBuffer {
+	Stack<String> commandHistory;
+	int commandHistoryIndex = 0;
+	
+	public CommandHistoryBuffer() {
+		commandHistory = new Stack<>();
+	}
+	
+	public void pushCommand(String command) {
+		if(commandHistory.size() > 1) {
+			if(!commandHistory.peek().equals(command))
+				commandHistory.push(command);
+		} else {
+			commandHistory.push(command);
+		}
+		
+		commandHistoryIndex = commandHistory.size();
+	}
+	
+	public String getCommandHistory() {
+		commandHistoryIndex = Math.clamp(commandHistoryIndex, 0, commandHistory.size());
+		if(commandHistoryIndex == commandHistory.size())
+			return "";
+		else
+			return commandHistory.get(commandHistoryIndex);
+	}
+}

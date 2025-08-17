@@ -33,7 +33,7 @@ public class ExclusionOrFilter implements SyslogFilter {
 	}
 	
 	@Override
-	public boolean evaluateMessage(BSDSyslogMessage message) {
+	public boolean evaluateMessage(BSDSyslogMessage message) {		
 		for(int i = 0; i < sequences.size(); i++) {
 			if(message.message.contains(sequences.get(i)))
 				return false;

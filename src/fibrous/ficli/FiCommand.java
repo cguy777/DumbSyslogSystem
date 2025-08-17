@@ -127,19 +127,20 @@ public abstract class FiCommand {
 			String token = null;
 			
 			//Quotation delineated
-			if(c == '"')
+			if(c == '"') {
 				token = readToDelineator(s, pos + 1, '"', false);
+				pos++;
 			//Whole word (whitespace delineated)
-			else if(c != ' ')
+			} else if(c != ' ') {
 				token = readToDelineator(s, pos, ' ', true);
+			}
 			
 			//Return null for error
 			if(token == null)
 				return null;
 			
 			tokens.add(token);
-			pos += token.length() + 2;
-			pos++;
+			pos += token.length() + 1;
 		}
 		
 		return tokens;
