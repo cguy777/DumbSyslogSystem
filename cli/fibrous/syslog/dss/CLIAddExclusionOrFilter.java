@@ -24,20 +24,16 @@ public class CLIAddExclusionOrFilter extends FiCommand {
 	@Override
 	public void execute() {
 		if(arguments.size() < 1) {
-			ios.println("Syntax error: must include a filter name");
-			return;
-		}
-		
-		if(arguments.size() < 2) {
 			ios.println("Syntax error: must include at least one sequence");
 			return;
 		}
 		
-		SoffitObject s_filter = new SoffitObject("ExclusionOr", arguments.get(0));
-		for(int i = 1; i < arguments.size(); i++)
-			s_filter.add(new SoffitField("sequence", arguments.get(i)));
+		ExclusionOrFilter filter = new ExclusionOrFilter(FilterDiscriminant.MESSAGE);
+		for(int i = 0; i < arguments.size(); i++) {
+			filter.addSequence(arguments.get(i));
+		}
 		
-		filterManager.addFilter(s_filter);
+		filterManager.addFilter(filter.serialize());
 		
 		ios.clearFilterEditor();
 		ios.printToFilterEditor(SoffitUtil.WriteStreamToString(filterManager.serializeAllFilters()));

@@ -1,8 +1,10 @@
 package fibrous.syslog.dss;
 
+import fibrous.soffit.SoffitException;
 import fibrous.soffit.SoffitObject;
 
 public abstract class SyslogFilter {
+	FilterDiscriminant discriminant;
 	boolean disabled = false;
 	public abstract boolean evaluateMessage(BSDSyslogMessage message);
 	public abstract SoffitObject serialize();
@@ -27,5 +29,14 @@ public abstract class SyslogFilter {
 		}
 		
 		return filter;
+	}
+	
+	public static FilterDiscriminant determineDiscriminant(SoffitObject s_filter) {
+		if(s_filter.hasField("message"))
+			return FilterDiscriminant.MESSAGE;
+		else if(s_filter.hasField("hostname"))
+			return FilterDiscriminant.HOSTNAME;
+		else
+			return FilterDiscriminant.INAVLID;
 	}
 }

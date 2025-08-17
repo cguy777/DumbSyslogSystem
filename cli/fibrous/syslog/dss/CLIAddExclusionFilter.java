@@ -30,10 +30,8 @@ public class CLIAddExclusionFilter extends FiCommand {
 		
 		String sequence = arguments.get(0);
 		
-		SoffitObject s_filter = new SoffitObject("Exclusion");
-		s_filter.add(new SoffitField("sequence", sequence));
-		
-		filterManager.addFilter(s_filter);
+		ExclusionFilter filter = new ExclusionFilter(FilterDiscriminant.MESSAGE, sequence);
+		filterManager.addFilter(filter.serialize());
 		
 		ios.clearFilterEditor();
 		ios.printToFilterEditor(SoffitUtil.WriteStreamToString(filterManager.serializeAllFilters()));
