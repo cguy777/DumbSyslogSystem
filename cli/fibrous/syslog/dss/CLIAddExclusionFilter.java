@@ -37,5 +37,6 @@ public class CLIAddExclusionFilter extends FiCommand {
 		
 		ios.clearFilterEditor();
 		ios.printToFilterEditor(SoffitUtil.WriteStreamToString(filterManager.serializeAllFilters()));
+		ios.showTab(1);
 	}
 }

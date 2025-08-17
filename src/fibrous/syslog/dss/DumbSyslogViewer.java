@@ -59,6 +59,8 @@ public class DumbSyslogViewer {
 		cli.addCommand(new CLIAddExclusionFilter("exc msg seq", filterManager, ios));
 		cli.addCommand(new CLIAddExclusionOrFilter("exc-or msg seq", filterManager, ios));
 		cli.addCommand(new CLIRemoveFilter("rem", filterManager, ios));
+		cli.addCommand(new CLIEnableFilter("enable", filterManager, ios));
+		cli.addCommand(new CLIDisableFilter("disable", filterManager, ios));
 		cli.addCommand(new CLIApplyFilters("apply", filterManager, messageHandler, ios));
 		cli.addCommand(new CLIClearConsole("clear console", ios));
 		

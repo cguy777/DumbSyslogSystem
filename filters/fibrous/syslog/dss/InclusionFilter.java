@@ -5,7 +5,7 @@ import fibrous.soffit.SoffitException;
 import fibrous.soffit.SoffitField;
 
 public class InclusionFilter extends SyslogFilter {
-	String sequence;
+	String msgSequence;
 	
 	private InclusionFilter() {
 		
@@ -13,7 +13,7 @@ public class InclusionFilter extends SyslogFilter {
 
 	@Override
 	public boolean evaluateMessage(BSDSyslogMessage message) {
-		return message.message.contains(sequence);
+		return message.message.contains(msgSequence);
 	}
 
 	@Override
@@ -23,7 +23,7 @@ public class InclusionFilter extends SyslogFilter {
 		if(disabled)
 			s_filter.add(new SoffitField("disabled"));
 		
-		s_filter.add(new SoffitField("sequence", sequence));
+		s_filter.add(new SoffitField("sequence", msgSequence));
 		
 		return s_filter;
 	}
@@ -34,7 +34,7 @@ public class InclusionFilter extends SyslogFilter {
 		if(s_filter.hasField("disabled"))
 			filter.disabled = true;
 		
-		filter.sequence = s_filter.getField("sequence").getValue();
+		filter.msgSequence = s_filter.getField("sequence").getValue();
 		
 		return filter;
 	}

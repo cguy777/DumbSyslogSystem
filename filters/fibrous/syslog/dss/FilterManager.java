@@ -41,6 +41,16 @@ public class FilterManager {
 		s_filters.removeAllObjects();
 	}
 	
+	public void setFilterEnabled(int configuredFilterIndex, boolean enabled) {
+		if(enabled) {
+			if(s_filters.objects.get(configuredFilterIndex).hasField("disabled"))
+				s_filters.objects.get(configuredFilterIndex).removeField("disabled");
+		} else {
+			if(!s_filters.objects.get(configuredFilterIndex).hasField("disabled"))
+				s_filters.objects.get(configuredFilterIndex).add(new SoffitField("disabled"));
+		}
+	}
+	
 	public void applyFilters() throws SoffitException {
 		filters.clear();
 		for(int i = 0; i < s_filters.objects.size(); i++) {
