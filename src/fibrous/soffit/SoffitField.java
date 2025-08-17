@@ -39,6 +39,11 @@ public class SoffitField {
 	
 	private int level = -1;
 	
+	public SoffitField(String name) {
+		this.name = name;
+		this.value = "";
+	}
+	
 	/**
 	 * Constructs a SoffitField with a specified name and value.
 	 * @param name

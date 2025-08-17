@@ -18,6 +18,10 @@ public class FilterManager {
 	
 	public boolean evaluateMessage(BSDSyslogMessage message) {
 		for(int i = 0; i < filters.size(); i++) {
+			//Check if disabled
+			if(filters.get(i).disabled)
+				continue;
+			
 			if(!filters.get(i).evaluateMessage(message))
 				return false;
 		}
@@ -48,7 +52,7 @@ public class FilterManager {
 		SoffitObject s_allFilters = new SoffitObject("Filters");
 		
 		for(int i = 0; i < s_filters.objects.size(); i++) {
-			//Performing a deserialize/serialize cycle ends up being the easiest way to do a full copy.
+			//Performing a deserialize/serialize cycle to make a full copy of the filter SoffitObject.
 			s_allFilters.add(SyslogFilter.deserialize(s_filters.objects.get(i)).serialize());
 			s_allFilters.objects.get(i).add(new SoffitField("number", String.valueOf(i)), 0);
 		}

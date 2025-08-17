@@ -4,15 +4,11 @@ import fibrous.soffit.SoffitObject;
 import fibrous.soffit.SoffitException;
 import fibrous.soffit.SoffitField;
 
-public class InclusionFilter implements SyslogFilter {
+public class InclusionFilter extends SyslogFilter {
 	String sequence;
 	
 	private InclusionFilter() {
 		
-	}
-	
-	public InclusionFilter(String sequence) {
-		this.sequence = sequence;
 	}
 
 	@Override
@@ -23,6 +19,10 @@ public class InclusionFilter implements SyslogFilter {
 	@Override
 	public SoffitObject serialize() {
 		SoffitObject s_filter = new SoffitObject("Inclusion");
+		
+		if(disabled)
+			s_filter.add(new SoffitField("disabled"));
+		
 		s_filter.add(new SoffitField("sequence", sequence));
 		
 		return s_filter;
@@ -30,6 +30,10 @@ public class InclusionFilter implements SyslogFilter {
 	
 	public static InclusionFilter deserialize(SoffitObject s_filter) throws SoffitException {
 		InclusionFilter filter = new InclusionFilter();
+		
+		if(s_filter.hasField("disabled"))
+			filter.disabled = true;
+		
 		filter.sequence = s_filter.getField("sequence").getValue();
 		
 		return filter;

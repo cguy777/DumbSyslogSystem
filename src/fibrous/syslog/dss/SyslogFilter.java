@@ -2,9 +2,10 @@ package fibrous.syslog.dss;
 
 import fibrous.soffit.SoffitObject;
 
-public interface SyslogFilter {
-	public boolean evaluateMessage(BSDSyslogMessage message);
-	public SoffitObject serialize();
+public abstract class SyslogFilter {
+	boolean disabled = false;
+	public abstract boolean evaluateMessage(BSDSyslogMessage message);
+	public abstract SoffitObject serialize();
 	
 	public static SyslogFilter deserialize(SoffitObject s_filter) {
 		SyslogFilter filter = null;
