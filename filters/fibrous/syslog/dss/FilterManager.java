@@ -86,10 +86,6 @@ public class FilterManager {
 	
 	public void setFiltersFromText(String filtersText) throws SoffitException {
 		filters.clear();		
-		try {
-			s_filters = SoffitUtil.ReadStreamFromString(filtersText);
-		} catch (SoffitException e) {
-			
-		}
+		s_filters = SoffitUtil.ReadStreamFromString(filtersText);
 	}
 }

@@ -18,19 +18,35 @@ public class CLIAddInclusionFilter extends FiCommand {
 		this.filterManager = filterManager;
 		this.ios = ios;
 		
-		this.commandDescription = "Adds a log message inclusion filter.  Usage: inc msg seq \"sequence of characters in quotations or a single word without\"";
+		this.commandDescription = "Adds a log host/message inclusion filter.  Usage: inc [host | msg] \"phrase to match\" \"OR another phrase to match with\" ...";
 	}
 
 	@Override
 	public void execute() {
 		if(arguments.size() < 1) {
-			ios.println("Syntax error: must include a sequence to include");
+			ios.println("Syntax error: must include type (host or msg)");
 			return;
 		}
 		
-		String sequence = arguments.get(0);
+		InclusionFilter filter = null;
+		if(arguments.get(0).equals("host")) {
+			filter = new InclusionFilter(FilterDiscriminant.HOSTNAME);
+		} else if(arguments.get(0).equals("msg")) {
+			filter = new InclusionFilter(FilterDiscriminant.MESSAGE);
+		} else {
+			ios.println("Syntax error: must include type (host or msg)");
+			return;
+		}
 		
-		InclusionFilter filter = new InclusionFilter(FilterDiscriminant.MESSAGE, sequence);
+		if(arguments.size() < 2) {
+			ios.println("Syntax error: must include at least one phrase to match against");
+			return;
+		}
+		
+		for(int i = 1; i < arguments.size(); i++) {
+			filter.addSequence(arguments.get(i));
+		}
+		
 		filterManager.addFilter(filter.serialize());
 		
 		ios.clearFilterEditor();

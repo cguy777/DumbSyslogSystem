@@ -15,17 +15,9 @@ public abstract class SyslogFilter {
 		if(s_filter.getType().equals("Inclusion")) {
 			filter = InclusionFilter.deserialize(s_filter);
 		}
-		//INCLUSION-OR
-		else if(s_filter.getType().equals("InclusionOr")) {
-			filter = InclusionOrFilter.deserialize(s_filter);
-		}
 		//EXCLUSION
 		else if(s_filter.getType().equals("Exclusion")) {
 			filter = ExclusionFilter.deserialize(s_filter);
-		}
-		//EXCLUSION-OR
-		else if(s_filter.getType().equals("ExclusionOr")) {
-			filter = ExclusionOrFilter.deserialize(s_filter);
 		}
 		
 		return filter;

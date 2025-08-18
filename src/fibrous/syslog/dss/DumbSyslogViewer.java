@@ -4,6 +4,9 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
@@ -16,12 +19,11 @@ import fibrous.ficli.FiState;
 import fibrous.ficli.FiCLI;
 import fibrous.soffit.SoffitException;
 import fibrous.soffit.SoffitObject;
+import fibrous.soffit.SoffitField;
 import fibrous.soffit.SoffitUtil;
 
 public class DumbSyslogViewer {
 	
-	InetAddress serverAddress;
-	int serverInterfacePort;
 	Socket socket;
 	
 	FilterManager filterManager;
@@ -31,13 +33,11 @@ public class DumbSyslogViewer {
 	DataReceiveHandler messageHandler;
 	Thread messageHandlerThread;
 	
-	public DumbSyslogViewer(InetAddress serverAddress, int serverInterfacePort) throws IOException {
-		this.serverAddress = serverAddress;
-		this.serverInterfacePort = serverInterfacePort;
+	boolean configured = false;
+	
+	public DumbSyslogViewer() throws IOException {
 		
-		filterManager = new FilterManager();
-		
-		JFrame frame = new JFrame("Dumb Syslog Viewer");
+		JFrame frame = new JFrame("DumbSyslogViewer");
 		frame.setSize(800, 600);
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		
@@ -47,26 +47,78 @@ public class DumbSyslogViewer {
 		frame.setVisible(true);
 		chb = new CommandHistoryBuffer();
 		
-		messageHandler = new DataReceiveHandler(serverAddress, serverInterfacePort, filterManager, console);
+		filterManager = new FilterManager();
+		try {
+			FileInputStream fis = new FileInputStream("ActiveFilters.soffit");
+			filterManager.s_filters = SoffitUtil.ReadStream(fis);
+			filterManager.applyFilters();
+			fis.close();
+		} catch (SoffitException e) {
+		} catch (IOException e) {
+		}
+		console.filterEditor.setText(SoffitUtil.WriteStreamToString(filterManager.serializeActiveFilters()));
+		
+		messageHandler = new DataReceiveHandler(null, -1, filterManager, console);
 		
 		GUIIOStream ios = new GUIIOStream(console);
 		
 		FiCLI cli = new FiCLI(ios, ios, "?");
 		cli.setCaret(" > ");
 		
-		cli.addCommand(new CLIAddInclusionFilter("inc msg seq", filterManager, ios));
-		cli.addCommand(new CLIAddInclusionOrFilter("inc-or msg seq", filterManager, ios));
-		cli.addCommand(new CLIAddExclusionFilter("exc msg seq", filterManager, ios));
-		cli.addCommand(new CLIAddExclusionOrFilter("exc-or msg seq", filterManager, ios));
+		cli.addCommand(new CLIAddInclusionFilter("inc", filterManager, ios));
+		cli.addCommand(new CLIAddExclusionFilter("exc", filterManager, ios));
 		cli.addCommand(new CLIRemoveFilter("rem", filterManager, ios));
 		cli.addCommand(new CLIEnableFilter("enable", filterManager, ios));
 		cli.addCommand(new CLIDisableFilter("disable", filterManager, ios));
 		cli.addCommand(new CLIApplyFilters("apply", filterManager, messageHandler, ios));
 		cli.addCommand(new CLIClearConsole("clear console", ios));
+		cli.addCommand(new CLISetServer("set server", messageHandler, ios, this));
+		cli.addCommand(new CLIConnect("connect", messageHandler, ios));
 		
 		console.enterButton.addActionListener(new DoCLIAction(cli, console, chb));
 		console.input.addKeyListener(new DoCLIAction(cli, console, chb));
 		console.input.addKeyListener(new CycleCommandHistoryAction(console, chb));
+		
+		//Write initial messages to console
+		console.printLineToConsole("DumbSyslogViewer");
+		console.printLineToConsole("Copyright (c) 2025, Noah McLean");
+		console.printLineToConsole("Type ? for available commands");
+		
+		loadSettings();
+		
+		if(!filterManager.filters.isEmpty())
+			console.printLineToConsole("THERE ARE CURRENTLY ACTIVE FILTERS");
+	}
+	
+	public void writeSettings() {
+		SoffitObject s_settings = new SoffitObject("root");
+		s_settings.add(new SoffitField("ServerHostname", messageHandler.serverAddress.getHostAddress()));
+		s_settings.add(new SoffitField("ServerInterfacePort", String.valueOf(messageHandler.serverInterfacePort)));
+		
+		try {
+			FileOutputStream fos = new FileOutputStream("ViewerSettings.soffit");
+			SoffitUtil.WriteStream(s_settings, fos);
+			fos.close();
+		} catch (IOException e) {
+			console.printLineToLog(e.getMessage());
+		}
+	}
+	
+	public void loadSettings() {
+		try {
+			FileInputStream fis = new FileInputStream("ViewerSettings.soffit");
+			SoffitObject s_settings = SoffitUtil.ReadStream(fis);
+			fis.close();
+			
+			messageHandler.serverAddress = InetAddress.getByName(s_settings.getField("ServerHostname").getValue());
+			messageHandler.serverInterfacePort = Integer.parseInt(s_settings.getField("ServerInterfacePort").getValue());
+			
+			configured = true;
+		} catch(FileNotFoundException e) {
+			console.printLineToConsole("No configuration found.  Please call \"set server\"");
+		} catch (IOException e) {
+			console.printLineToLog(e.getMessage());
+		}
 	}
 	
 	public void receiveData() {
@@ -74,7 +126,7 @@ public class DumbSyslogViewer {
 	}
 	
 	public static void main(String[]args) throws SoffitException, IOException {
-		DumbSyslogViewer client = new DumbSyslogViewer(InetAddress.getByName("10.0.50.118"), 54321);
+		DumbSyslogViewer client = new DumbSyslogViewer();
 		
 		client.receiveData();
 	}
@@ -88,6 +140,8 @@ class DataReceiveHandler implements Runnable {
 	FilterManager filterManager;
 	FiGUIConsole console;
 	
+	volatile boolean connect = true;
+	
 	public DataReceiveHandler(InetAddress serverAddress, int serverInterfacePort, FilterManager filterManager, FiGUIConsole console) {
 		this.serverAddress = serverAddress;
 		this.serverInterfacePort = serverInterfacePort;
@@ -98,23 +152,51 @@ class DataReceiveHandler implements Runnable {
 	@Override
 	public void run() {
 		while(true) {
+			if(serverAddress == null)
+				connect = false;
+			
+			if(!connect) {
+				try {
+					Thread.sleep(500);
+				} catch (InterruptedException e) {}
+				continue;
+			}
+			
 			try {
+				console.clearLog();
+				console.printLineToConsole("Connecting to server...");
 				socket = new Socket(serverAddress, serverInterfacePort);
+				console.printLineToConsole("Connected to server.  Will begin receiving logs");
 			} catch (IOException e) {
-				e.printStackTrace();
+				console.printToConsole("Could not connect to server.");
+				if(connect)
+					console.printToConsole("  Will try again.");
+				console.printToConsole("\n");
+				continue;
 			}
 			
 			while(true) {
+				if(!connect) {
+					console.printLineToConsole("Disconnected");
+					break;
+				}
+				
 				try {
 					receiveData();
 				} catch (SoffitException e) {
-					System.out.println("Resetting (SOFFIT)");
+					console.printToConsole("Disconnected.");
+					if(connect)
+						console.printToConsole("  Will attempt re-connection and refresh displayed logs");
+					console.printToConsole("\n");
 					break;
 				} catch (SocketException e) {
-					System.out.println("Resetting (Socket)");
+					console.printToConsole("Disconnected.");
+					if(connect)
+						console.printToConsole("  Will attempt re-connection and refresh displayed logs");
+					console.printToConsole("\n");
 					break;
-				} catch (IOException e) {
-					e.printStackTrace();
+				} catch (Exception e) {
+					console.printLineToConsole(e.getMessage());
 					break;
 				}
 			}
@@ -123,10 +205,9 @@ class DataReceiveHandler implements Runnable {
 	
 	public void resetConnection() {
 		try {
-			socket.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+			if(socket != null)
+				socket.close();
+		} catch (IOException e) {}
 	}
 
 	public void receiveData() throws SoffitException, SocketException, IOException {
