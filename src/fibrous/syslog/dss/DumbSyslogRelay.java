@@ -30,13 +30,7 @@ public class DumbSyslogRelay {
         System.arraycopy(inPacket.getData(), inPacket.getOffset(), trimmedBuffer, 0, inPacket.getLength());
         
         BSDSyslogMessage message = BSDSyslogMessage.parseMessage(trimmedBuffer, inPacket.getAddress());
-<<<<<<< Updated upstream
-        
-        message.message = "(RELAYED - ORIGIN:" + message.hostname + ") " + message.message;
         trimmedBuffer = message.getMessageAsFormattedString(true).getBytes();
-=======
-        trimmedBuffer = message.getMessageAsString(true).getBytes();
->>>>>>> Stashed changes
         
         outPacket = new DatagramPacket(trimmedBuffer, trimmedBuffer.length);
         outPacket.setAddress(remoteAddress);
