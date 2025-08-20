@@ -5,19 +5,19 @@ import java.net.UnknownHostException;
 
 import fibrous.ficli.FiCommand;
 
-public class CLISetServer extends FiCommand {
+public class CLIServerSet extends FiCommand {
 	
 	DataReceiveHandler drh;
 	GUIIOStream ios;
 	DumbSyslogViewer viewer;
 
-	public CLISetServer(String commandString, DataReceiveHandler drh, GUIIOStream ios, DumbSyslogViewer viewer) {
+	public CLIServerSet(String commandString, DataReceiveHandler drh, GUIIOStream ios, DumbSyslogViewer viewer) {
 		super(commandString);
 		this.drh = drh;
 		this.ios = ios;
 		this.viewer = viewer;
 		
-		this.commandDescription = "Sets the DumbSyslogServer this viewer is pointed towards.  Usage: set server [ip/hostname] [port]";
+		this.commandDescription = "Sets the DumbSyslogServer this viewer is pointed towards.  Usage: server set [ip/hostname] [port]";
 	}
 
 	@Override

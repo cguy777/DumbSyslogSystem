@@ -73,7 +73,8 @@ public class DumbSyslogViewer {
 		cli.addCommand(new CLIDisableFilter("disable", filterManager, ios));
 		cli.addCommand(new CLIApplyFilters("apply", filterManager, messageHandler, ios));
 		cli.addCommand(new CLIClearConsole("clear console", ios));
-		cli.addCommand(new CLISetServer("set server", messageHandler, ios, this));
+		cli.addCommand(new CLIServerSet("server set", messageHandler, ios, this));
+		cli.addCommand(new CLIServerShow("server show", messageHandler, ios, this));
 		cli.addCommand(new CLIConnect("connect", messageHandler, ios));
 		
 		console.enterButton.addActionListener(new DoCLIAction(cli, console, chb));
@@ -116,7 +117,7 @@ public class DumbSyslogViewer {
 			
 			configured = true;
 		} catch(FileNotFoundException e) {
-			console.printLineToConsole("No configuration found.  Please call \"set server\"");
+			console.printLineToConsole("No configuration found.  Please call \"server set\"");
 		} catch (IOException e) {
 			console.printLineToLog(e.getMessage());
 		}
