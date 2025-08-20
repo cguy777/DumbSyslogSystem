@@ -19,6 +19,10 @@ public abstract class SyslogFilter {
 		else if(s_filter.getType().equals("Exclusion")) {
 			filter = ExclusionFilter.deserialize(s_filter);
 		}
+		//SEVERITY
+		else if(s_filter.getType().equals("Severity")) {
+			filter = SeverityFilter.deserialize(s_filter);
+		}
 		
 		return filter;
 	}
