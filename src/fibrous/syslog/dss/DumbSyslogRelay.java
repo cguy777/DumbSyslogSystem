@@ -1,8 +1,12 @@
 package fibrous.syslog.dss;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+
+import fibrous.soffit.SoffitObject;
+import fibrous.soffit.SoffitUtil;
 
 public class DumbSyslogRelay {
     DatagramSocket inputSocket;
@@ -14,11 +18,28 @@ public class DumbSyslogRelay {
     
     int forwardedPort;
 
-    public DumbSyslogRelay(InetAddress toAddress, int port) throws IOException {
-        inputSocket = new DatagramSocket(port);
+    public DumbSyslogRelay() throws IOException {
+    	
+    	FileInputStream fis = new FileInputStream("config_relay");
+    	SoffitObject s_config = SoffitUtil.ReadStream(fis);
+    	fis.close();
+    	
+    	if(s_config.hasField("SyslogPort"))
+    		forwardedPort = Integer.parseInt(s_config.getField("SyslogPort").getValue());
+    	else {
+    		System.err.println("\"SyslogPort\" not found in config");
+    		System.exit(-1);
+    	}
+    	
+    	if(s_config.hasField("ServerAddress"))
+    		remoteAddress = InetAddress.getByName(s_config.getField("ServerAddress").getValue());
+    	else {
+    		System.err.println("\"ServerAddress\" not found in config");
+    		System.exit(-1);
+    	}
+    	
+        inputSocket = new DatagramSocket(forwardedPort);
         outputSocket = new DatagramSocket();
-        remoteAddress = toAddress;
-        forwardedPort = port;
     }
 
     public void processTraffic() throws IOException {
@@ -39,14 +60,16 @@ public class DumbSyslogRelay {
     }
 
     public static void main(String[]args) throws IOException {
-        if(args.length < 1) {
-            System.out.println("Usage: [destination IP address/Hostname] [destination port]");
-        }
-
-        InetAddress address = InetAddress.getByName(args[0]);
-        int port = Integer.parseInt((args[1]));
-
-        DumbSyslogRelay forwarder = new DumbSyslogRelay(address, port);
+    	DumbSyslogRelay forwarder = null;
+    	try {
+    		forwarder = new DumbSyslogRelay();
+    		System.out.println("DumbSyslogRelay has started");
+    		System.out.println("Listening on port " + forwarder.forwardedPort + " And forwarding to " + forwarder.remoteAddress.getHostAddress());
+    	} catch (IOException e) {
+    		System.err.println("Error loading config or starting DumbSyslogRelay: " + e.getMessage());
+    		e.printStackTrace();
+    		System.exit(-1);
+    	}
 
         while(true) {
             forwarder.processTraffic();

@@ -81,7 +81,7 @@ public class DumbSyslogServer {
 	
 	public static void main(String[]args) throws IOException {
 		//Load config
-		FileInputStream configStream = new FileInputStream("config");
+		FileInputStream configStream = new FileInputStream("config_server");
 		SoffitObject s_config = SoffitUtil.ReadStream(configStream);
 		configStream.close();
 		
@@ -138,14 +138,6 @@ class SyslogHandler implements Runnable {
 			subscriberHandler.pushMessage(syslogMessage);
 			
 			logFileManager.writeLog(syslogMessage, data);
-			
-			/*
-			System.out.println(syslogMessage.pri);
-			System.out.println(syslogMessage.originalTimestamp);
-			System.out.println(syslogMessage.hostname);
-			System.out.println(syslogMessage.message);
-			System.out.println();
-			*/
 		}
 		
 		try {

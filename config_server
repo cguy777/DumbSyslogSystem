@@ -1,8 +1,8 @@
 __SoffitStart
 
 #Log storage location suggestions.  The choice is ultimately up to you.
-#Feel free to uncomment whichever matches your system, or modify to your liking
-#If no storage location is specified, syslog messages will only be stored in memory.
+#Feel free to uncomment whichever matches your system, or modify to your liking.
+#If no storage location is specified, syslog messages will only be stored in memory (not recommended for most cases).
 #LogStorageLocation "/var/DumbSyslogServer/logs"
 #LogStorageLocation "C:/DumbSyslogServer/logs"
 
@@ -22,10 +22,11 @@ SyslogPort "514"
 
 #How many hours logs will be stored on this device.
 #A value of 0 indicates permanent until manually deleted
-LogStorageHours "24"
+LogStorageHours "0"
 
 #The max amount of syslog messages that are stored in memory.
+#This also directly affects how many logs can be pulled by a user interface.
 #Syslog messages can always be retrieved from disk if not deleted, but this can be used for memory footprint purposes. 
-MessageBufferCount "1000"
+MessageBufferCount "10000"
 
 __SoffitEnd
