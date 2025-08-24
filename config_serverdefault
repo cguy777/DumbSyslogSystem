@@ -3,8 +3,8 @@ __SoffitStart
 #Log storage location suggestions.  The choice is ultimately up to you.
 #Feel free to uncomment whichever matches your system, or modify to your liking.
 #If no storage location is specified, syslog messages will only be stored in memory (not recommended for most cases).
-#LogStorageLocation "/var/DumbSyslogServer/logs"
-#LogStorageLocation "C:/DumbSyslogServer/logs"
+#LogStorageLocation "/var/dumbsyslogserver/logs"
+#LogStorageLocation "C:/dumbsyslogserver/logs"
 
 #The UDP port that syslog messages will be received on.
 #514 is the standard port 
