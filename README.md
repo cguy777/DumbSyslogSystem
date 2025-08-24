@@ -1,4 +1,4 @@
-# The DumbSyslogSystem
+# DumbSyslogSystem
 
 DumbSyslogSystem is a dumb-simple set of services/applications that provide syslog capabilities.  There are three components to the DumbSyslogSystem:  
 - DumbSyslogServer
