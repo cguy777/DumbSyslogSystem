@@ -18,13 +18,13 @@ public class CLIAddExclusionFilter extends FiCommand {
 		this.filterManager = filterManager;
 		this.ios = ios;
 		
-		this.commandDescription = "Adds a log host/message exclusion filter.  Usage: exc [host | msg] \"phrase to match\" \"OR another phrase to match with\" ...";
+		this.commandDescription = "Adds a host/message/facility exclusion filter.  Usage: inc [host | msg | fac] \"phrase or facility number to match\" \"OR another phrase or facility number to match\" ...";
 	}
 
 	@Override
 	public void execute() {
 		if(arguments.size() < 1) {
-			ios.println("Syntax error: must include type (host or msg)");
+			ios.println("Syntax error: must include type (host, msg, or fac)");
 			return;
 		}
 		
@@ -33,18 +33,39 @@ public class CLIAddExclusionFilter extends FiCommand {
 			filter = new ExclusionFilter(FilterDiscriminant.HOSTNAME);
 		} else if(arguments.get(0).equals("msg")) {
 			filter = new ExclusionFilter(FilterDiscriminant.MESSAGE);
+		} else if(arguments.get(0).equals("fac")) {
+			filter = new ExclusionFilter(FilterDiscriminant.FACILITY);
 		} else {
-			ios.println("Syntax error: must include type (host or msg)");
+			ios.println("Syntax error: must include valid type (host, msg, or fac)");
 			return;
 		}
 		
 		if(arguments.size() < 2) {
-			ios.println("Syntax error: must include at least one phrase to match against");
+			ios.println("Syntax error: must include at least one argument to match against");
 			return;
 		}
 		
-		for(int i = 1; i < arguments.size(); i++) {
-			filter.addSequence(arguments.get(i));
+		if(filter.discriminant == FilterDiscriminant.FACILITY) {
+			for(int i = 1; i < arguments.size(); i++) {
+				int f = 0;
+				try {
+					f = Integer.parseInt(arguments.get(i));
+				} catch (NumberFormatException e) {
+					ios.println("Error: facilities must be a number between 0-23");
+					return;
+				}
+				
+				if(f < 0 || f > 23) {
+					ios.println("Error: facilities must be a number between 0-23");
+					return;
+				}
+				
+				filter.addFacility(f);
+			}
+		} else {
+			for(int i = 1; i < arguments.size(); i++) {
+				filter.addSequence(arguments.get(i));
+			}
 		}
 		
 		filterManager.addFilter(filter.serialize());

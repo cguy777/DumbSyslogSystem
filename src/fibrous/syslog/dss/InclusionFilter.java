@@ -9,13 +9,16 @@ import fibrous.soffit.SoffitField;
 public class InclusionFilter extends SyslogFilter {
 	
 	ArrayList<String> sequences;
+	ArrayList<Integer> facilities;
 	
 	private InclusionFilter() {
 		sequences = new ArrayList<>();
+		facilities = new ArrayList<>();
 	}
 	
 	public InclusionFilter(FilterDiscriminant disc) {
 		sequences = new ArrayList<>();
+		facilities = new ArrayList<>();
 		this.discriminant = disc;
 	}
 	
@@ -23,12 +26,8 @@ public class InclusionFilter extends SyslogFilter {
 		sequences.add(sequence);
 	}
 	
-	public boolean removeSequence(String sequence) {
-		return sequences.remove(sequence);
-	}
-	
-	public void removeSequence(int index) {
-		sequences.remove(index);
+	public void addFacility(int facility) {
+		facilities.add(facility);
 	}
 
 	@Override
@@ -45,6 +44,14 @@ public class InclusionFilter extends SyslogFilter {
 		case MESSAGE:
 			for(int i = 0; i < sequences.size(); i++) {
 				if(message.message.contains(sequences.get(i)))
+					return true;
+			}
+			
+			return false;
+			
+		case FACILITY:
+			for(int i = 0; i < facilities.size(); i++) {
+				if(message.getFacility() == facilities.get(i))
 					return true;
 			}
 			
@@ -68,6 +75,8 @@ public class InclusionFilter extends SyslogFilter {
 			break;
 		case MESSAGE: disc = "message";
 			break;
+		case FACILITY: disc = "facility";
+			break;
 		default:
 			disc = "invalid";
 		}
@@ -75,8 +84,13 @@ public class InclusionFilter extends SyslogFilter {
 		if(disc.equals("invalid")) {
 			s_filter.add(new SoffitField(disc));
 		} else {
-			for(int i = 0; i < sequences.size(); i++) {
-				s_filter.add(new SoffitField(disc, sequences.get(i)));
+			if(discriminant == FilterDiscriminant.FACILITY) {
+				for(int i = 0; i < facilities.size(); i++)
+					s_filter.add(new SoffitField(disc, String.valueOf(facilities.get(i))));
+			} else {
+				for(int i = 0; i < sequences.size(); i++) {
+					s_filter.add(new SoffitField(disc, sequences.get(i)));
+				}
 			}
 		}
 		
@@ -98,12 +112,30 @@ public class InclusionFilter extends SyslogFilter {
 		case MESSAGE:
 			seqs = s_filter.getFieldsByName("message");
 			break;
+		case FACILITY:
+			seqs = s_filter.getFieldsByName("facility");
+			break;
 		case INAVLID:
-			throw new SoffitException("hostname or message not present in filter");
+			throw new SoffitException("neither hostname, message, nor facility present in filter");
 		}
 		
 		for(int i = 0; i < seqs.size(); i++) {
-			filter.addSequence(seqs.get(i).getValue());
+			//Some extra validity tests for facility numbers
+			if(filter.discriminant == FilterDiscriminant.FACILITY) {
+				int f = 0;
+				try {
+					f = Integer.parseInt(seqs.get(i).getValue());
+				} catch (NumberFormatException e) {
+					throw new SoffitException("\"facility\" field must be a number between 0-23");
+				}
+				
+				if(f < 0 || f > 23)
+					throw new SoffitException("\"facility\" field must be a number between 0-23");
+				
+				filter.addFacility(Integer.parseInt(seqs.get(i).getValue()));
+			} else {
+				filter.addSequence(seqs.get(i).getValue());
+			}
 		}
 		
 		return filter;

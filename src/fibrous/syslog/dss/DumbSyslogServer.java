@@ -137,7 +137,7 @@ class SyslogHandler implements Runnable {
 			
 			subscriberHandler.pushMessage(syslogMessage);
 			
-			logFileManager.writeLog(syslogMessage, data);
+			logFileManager.writeLog(syslogMessage);
 		}
 		
 		try {
@@ -304,7 +304,7 @@ class LogFileManager implements Runnable {
 		}
 	}
 	
-	public void writeLog(BSDSyslogMessage syslogMessage, SyslogData data) {
+	public void writeLog(BSDSyslogMessage syslogMessage) {
 		//Don't write logs if not storing
 		if(!storeLogs)
 			return;
@@ -329,7 +329,7 @@ class LogFileManager implements Runnable {
 				fileName = logStorageLocation + syslogMessage.hostname + "/" + SyslogUtils.getFileFriendlyTimestamp(syslogMessage.originalTimestamp);
 			
 			FileOutputStream fos = new FileOutputStream(fileName, true);
-			fos.write(data.data);
+			fos.write(syslogMessage.getMessageAsFormattedString(!disregardTimestamp).getBytes());
 			fos.write((int) '\n');
 			fos.close();
 			knownFiles.add(new LogFile(Path.of(fileName), System.currentTimeMillis()));

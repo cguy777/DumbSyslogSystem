@@ -32,6 +32,8 @@ public abstract class SyslogFilter {
 			return FilterDiscriminant.MESSAGE;
 		else if(s_filter.hasField("hostname"))
 			return FilterDiscriminant.HOSTNAME;
+		else if(s_filter.hasField("facility"))
+			return FilterDiscriminant.FACILITY;
 		else
 			return FilterDiscriminant.INAVLID;
 	}
