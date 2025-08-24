@@ -143,7 +143,7 @@ You can also use GraalVM's native-image tool to natively compile DumbSyslogRelay
 
 ## DumbSyslogViewer
 
-DumbSyslogViewer is a Java based desktop app that displays and filters logs in real-time.  If you're on windows, you can download DumbSyslogViewer pre-packaged with a JVM with a native windows launcher so you don't have to separately install Java.
+DumbSyslogViewer is a Java based desktop app that displays and filters logs in real-time.  If you're on windows, you can download DumbSyslogViewer pre-packaged with a JVM and a native windows launcher so you don't have to separately install Java.
 
 There are three main components to DumbSyslogViewer:  
 - Syslog viewer
@@ -301,7 +301,7 @@ Inclusion {
 }
 ~~~
 
-You could encounter a filter with numerous fields that you would rather not have to completely re-input through the CLI.  Manually editing the filter could save you time and prevent mistakes in this scenario.  However, as stated previously, inclusion and exclusion filters must only contain one type to operate only.  I.e., they can only be evaluating hostnames, or only evaluating facility numbers.  
+You could encounter a filter with numerous fields that you would rather not have to completely re-input through the CLI.  Manually editing the filter could save you time and prevent mistakes in this scenario.  However, as stated previously, inclusion and exclusion filters must only contain one type.  I.e., they can only be evaluating hostnames, or only evaluating facility numbers.  
 
 Consider the following inclusion filter:
 
@@ -326,4 +326,4 @@ Again, this is why it is typically recommended to only create filters through th
 
 ### native-image for DumbSyslogViewer?
 
-Currently there is a windows build of DumbSyslogViewer that has a self-contained JVM with a native launcher.  If you so desire, you can also use the jpackage too to do the same for linux or any other OS with full-featured JDKs available.  However, at this time, you cannot natively compile DumbSyslogViewer with GraalVM's native-image tool.  Well, you can compile it, but it won't run.  There's currently an issue with Java Swing (the GUI framework that currently powers the viewer) and the native-image tool.  Since Java Swing is a dead framework, this realistically isn't an issue that will be resolved.  Jpackage (or a third-party solution is currently 
+Currently there is a windows build of DumbSyslogViewer that has a self-contained JVM with a native launcher.  If you so desire, you can also use the jpackage too to do the same for linux or any other OS with full-featured JDKs available.  However, at this time, you cannot natively compile DumbSyslogViewer with GraalVM's native-image tool.  Well, you can compile it, but it won't run.  There's currently an issue with Java Swing (the GUI framework that currently powers the viewer) and the native-image tool.  Since Java Swing is a dead framework, this realistically isn't an issue that will be resolved.
