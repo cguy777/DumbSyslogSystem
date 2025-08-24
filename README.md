@@ -1,4 +1,4 @@
-# The DumbSyslogSystem Syslog Products
+# The DumbSyslogSystem
 
 DumbSyslogSystem is a Java based set of services/applications that provide syslog capabilities.  There are three components to the DumbSyslogSystem:  
 - DumbSyslogServer
@@ -73,7 +73,9 @@ Now we can enable this service to automatically run on system startup:
 sudo systemctl enable dumbsyslogserver
 ~~~
 
-That's about all there is to a typical DumbSyslogServer deployment.
+### An Alternative Deployment Strategy
+
+You may not be excited by having to employ a JVM/JDK in order to use DumbSyslogServer.  However, if you choose GraalVM (I recommend the community edition for licensing reasons) as your deployment JVM/JDK, you can optionally natively compile DumbSyslogServer.  Simply call `native-image -jar DumbSyslogServer.jar` and a native executable will be output.  You can then directly call this executable instead of having to call `java -jar DumbSyslogServer`.  You may see an error similar to `It appears as though libz:.a is missing. Please install it.`  As of writing this, this can be satisfied with `sudo apt install libz-dev`  However, packages do change, and this may not be accurate in the future.  Other than satisfying that one specific dependency, you shouldn't have any trouble on a fresh install of Debian 12.  Again, this is not a required step, but it might satisfy a specific need or want that you may have.  If you go this route, you no longer need to call `java` from you systemd service, and you will also be calling the native executable, and not the jar file.
 
 ## DumbSyslogRelay Deployment Guide
 
@@ -135,7 +137,9 @@ Now we can enable this service to automatically run on system startup:
 sudo systemctl enable dumbsyslogrelay
 ~~~
 
-That's all there is to DumbSyslogRelay.
+### An Alternative Deployment Strategy
+
+You can also use GraalVM's native-image tool to natively compile DumbSyslogRelay.  See the same section for DumbSyslogServer.
 
 ## DumbSyslogViewer
 
@@ -295,3 +299,7 @@ Inclusion {
 ~~~
 
 Again, this is why it is typically recommended to only create filters through the CLI: it prevents confusing mistakes like this and is typically faster.
+
+### native-image for DumbSyslogViewer?
+
+Currently there is a windows build of DumbSyslogViewer that has a self-contained JVM with a native launcher.  If you so desire, you can also use the jpackage too to do the same for linux or any other OS with full featured JDKs available.  However, at this time, you cannot natively compile DumbSyslogViewer with GraalVM's native-image tool.  Well, you can compile it, but it won't run.  There's currently an issue with Java Swing (the GUI framework that currently powers the viewer) and the native-image tool.  Since Java Swing is a dead framework, this realistically isn't an issue that will be resolved.  Jpackage (or a third-party solution is currently 
