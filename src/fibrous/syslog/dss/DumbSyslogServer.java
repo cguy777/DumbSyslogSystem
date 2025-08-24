@@ -134,10 +134,9 @@ class SyslogHandler implements Runnable {
 			
 			BSDSyslogMessage syslogMessage = BSDSyslogMessage.parseMessage(data.data, data.address);
 			syslogBuffer.addMessage(syslogMessage);
+			logFileManager.writeLog(syslogMessage);
 			
 			subscriberHandler.pushMessage(syslogMessage);
-			
-			logFileManager.writeLog(syslogMessage);
 		}
 		
 		try {
@@ -187,6 +186,7 @@ class SyslogSubscriber {
 	
 	Socket socket;
 	SubscriberHandler handler;
+	volatile boolean performingInitialPush = true;
 	
 	public SyslogSubscriber(Socket socket, SubscriberHandler handler) {
 		this.socket = socket;
@@ -223,15 +223,16 @@ class SubscriberHandler implements Runnable {
 		while(true) {
 			try {
 				Socket socket = ss.accept();
-				SyslogSubscriber subscriber = new SyslogSubscriber(socket, this);
-				subscribers.add(subscriber);
+				SyslogSubscriber sub = new SyslogSubscriber(socket, this);
+				subscribers.add(sub);
 				
 				//Relay the current buffer to the subscriber
 				Thread.ofVirtual().start(() -> {
 					ArrayDeque<BSDSyslogMessage> bufferedMessages = buffer.getCopyOfBuffer();
 					while(!bufferedMessages.isEmpty()) {
-						subscriber.pushMessage(bufferedMessages.pollLast());
+						sub.pushMessage(bufferedMessages.pollLast());
 					}
+					sub.performingInitialPush = false;
 				});
 			} catch (IOException e) {
 				e.printStackTrace();
@@ -241,7 +242,18 @@ class SubscriberHandler implements Runnable {
 	
 	public void pushMessage(BSDSyslogMessage message) {
 		for(int i = 0; i < subscribers.size(); i++) {
-			subscribers.get(i).pushMessage(message);
+			SyslogSubscriber sub = subscribers.get(i);
+			while(true) {
+				if(sub.performingInitialPush) {
+					try {
+						Thread.sleep(50);
+					} catch (InterruptedException e) {}
+					continue;
+				}
+			
+				sub.pushMessage(message);
+				break;
+			}
 		}
 	}
 }

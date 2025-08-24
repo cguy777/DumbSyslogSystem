@@ -13,12 +13,12 @@ SyslogPort "514"
 #Uncomment this to save syslog messages based on the time this server received the messages.
 #The data inside the file will always have the self-reported timestamp, if available.
 #Badly formatted syslog messages will always have a generated timestamp based on when the message was received.
-#DisregardTimestamp "True"
+DisregardTimestamp "True"
 
 #The TCP port on which a user interface will connect on.
 #Default recommended port is 54321.
 #If no port is specified then no compliant user interfaces can connect.
-#InterfacePort "54321"
+InterfacePort "54321"
 
 #How many hours logs will be stored on this device.
 #A value of 0 indicates permanent until manually deleted

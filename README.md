@@ -1,11 +1,11 @@
 # The DumbSyslogSystem
 
-DumbSyslogSystem is a Java based set of services/applications that provide syslog capabilities.  There are three components to the DumbSyslogSystem:  
+DumbSyslogSystem is a dumb-simple set of services/applications that provide syslog capabilities.  There are three components to the DumbSyslogSystem:  
 - DumbSyslogServer
 - DumbSyslogRelay
 - DumbSyslogViewer
 
-Their purpose should be mostly self-explanatory, but here's the explanation: DumbSyslogServer provides traditional BSD syslog (RFC 3164) server capabilities, while also correcting minor formatting issues.  It also provides a mechanism for the real-time viewing of syslogs as they are received.  DumbSyslogRelay is purely a relay for syslogs.  It simply receives syslogs, and then forwards them to a specified server.  DumbSyslogRelay also will correct minor formatting issues before relaying the syslog.  DumbSyslogViewer is primarily designed to view logs as they are received, but will display all logs that are currently stored inside DumbSyslogServer's memory buffer.  DumbSyslogViewer also has the capability to filter messages based on hostname/address, message body content, and severity.  
+Their purpose should be mostly self-explanatory, but here's the explanation anyways: DumbSyslogServer provides traditional BSD syslog (RFC 3164) server capabilities.  It also provides a mechanism for the real-time viewing of syslogs as they are received.  DumbSyslogRelay is purely a relay for syslogs.  It simply receives syslogs, and then forwards them to a specified server.  DumbSyslogViewer is primarily designed to view logs as they are received, but will display all logs that are currently stored inside DumbSyslogServer's memory buffer.  DumbSyslogViewer also has the capability to filter messages based on hostname/address, message body content, facility, and severity.  
 
 ## DumbSyslogServer Deployment Guide
 
@@ -201,35 +201,43 @@ Usage:
 
 A facility filter mandates that a syslog's facility matches one of the specified facility numbers.  There are two sub-types: inclusion and exclusion.  Inclusion mandates that a syslog's facility must contain a specified facility number in order to be displayed.  Exclusion mandates that a syslog's facility must not contain a specified facility number in order to be displayed.  If more than one facility number is specified in a single filter, then those phrase conditions are OR'd.  I.e., if an inclusion filter has two facility numbers of type 0 and 5, then a syslog will be displayed if it contains either facility number 0 OR 5.  Similarly, if an exclusion filter has two facility numbers of type 0 and 5, then a syslog will be not be displayed if it contain either facility numbers 0 OR 5.  
 This facility number table is from the BSD syslog specification (RFC 3164):  
-> 0             kernel messages  
-1              user-level messages  
-2              mail system  
-3              system daemons  
-4              security/authorization messages (note 1)  
-5              messages generated internally by syslogd  
-6              line printer subsystem  
-7              network news subsystem  
-8              UUCP subsystem  
-9              clock daemon (note 2)  
-10             security/authorization messages (note 1)  
-11             FTP daemon  
-12             NTP subsystem  
-13             log audit (note 1)  
-14             log alert (note 1)  
-15             clock daemon (note 2)  
-16             local use 0  (local0)  
-17             local use 1  (local1)  
-18             local use 2  (local2)  
-19             local use 3  (local3)  
-20             local use 4  (local4)  
-21             local use 5  (local5)  
-22             local use 6  (local6)  
-23             local use 7  (local7)  
->
-Table 1.  syslog Message Facilities
->
-Note 1 - Various operating systems have been found to utilize Facilities 4, 10, 13 and 14 for security/authorization, audit, and alert messages which seem to be similar.  
-Note 2 - Various operating systems have been found to utilize both Facilities 9 and 15 for clock (cron/at) messages.  
+
+~~~
+Numerical					Facility
+   Code
+    0					kernel messages  
+    1					user-level messages  
+    2					mail system  
+    3					system daemons  
+    4					security/authorization messages (note 1)  
+    5					messages generated internally by syslogd  
+    6					line printer subsystem  
+    7					network news subsystem  
+    8					UUCP subsystem  
+    9					clock daemon (note 2)  
+   10					security/authorization messages (note 1)  
+   11					FTP daemon  
+   12					NTP subsystem  
+   13					log audit (note 1)  
+   14					log alert (note 1)  
+   15					clock daemon (note 2)  
+   16					local use 0  (local0)  
+   17					local use 1  (local1)  
+   18					local use 2  (local2)  
+   19					local use 3  (local3)  
+   20					local use 4  (local4)  
+   21					local use 5  (local5)  
+   22					local use 6  (local6)  
+   23					local use 7  (local7)  
+
+	Table 1.  syslog Message Facilities
+
+Note 1 - Various operating systems have been found to utilize
+	Facilities 4, 10, 13 and 14 for security/authorization,
+	audit, and alert messages which seem to be similar.
+Note 2 - Various operating systems have been found to utilize
+	both Facilities 9 and 15 for clock (cron/at) messages.
+~~~
 
 FYI, all inclusion and exclusion filters are structurally and syntactically the same type of filter, but operate differently based on what the first field type is (hostname, message, or facility).  
 
@@ -241,7 +249,23 @@ Usage:
 severity [minimum severity level 0-7]
 ~~~
 
-A severity filter mandates that a syslog's severity meets a minimum threshold in order to be displayed.  A severity of 7 represents the most insignificant of messages (debug messages).  A severity of 0 represents the most significant of messages (emergency messages).
+A severity filter mandates that a syslog's severity meets a minimum threshold in order to be displayed.  A severity of 7 represents the most insignificant of messages (debug messages).  A severity of 0 represents the most significant of messages (emergency messages).  The following severity level table is from the BSD Syslog specification (RFC 3164)  
+
+~~~
+Numerical					Severity  
+  Code 
+
+   0			Emergency: system is unusable  
+   1			Alert: action must be taken immediately  
+   2			Critical: critical conditions  
+   3			Error: error conditions  
+   4			Warning: warning conditions  
+   5			Notice: normal but significant condition  
+   6			Informational: informational messages  
+   7			Debug: debug-level messages  
+
+   Table 2. syslog Message Severities
+~~~
 
 **Combined filter behavior**  
 If there are multiple filters active at one time, then the filters are logically AND'd together.  In other words, a syslog must meet the requirements of ALL filters in order to be displayed.  Because filters are only logically AND'd, filter order does not matter.
@@ -302,4 +326,4 @@ Again, this is why it is typically recommended to only create filters through th
 
 ### native-image for DumbSyslogViewer?
 
-Currently there is a windows build of DumbSyslogViewer that has a self-contained JVM with a native launcher.  If you so desire, you can also use the jpackage too to do the same for linux or any other OS with full featured JDKs available.  However, at this time, you cannot natively compile DumbSyslogViewer with GraalVM's native-image tool.  Well, you can compile it, but it won't run.  There's currently an issue with Java Swing (the GUI framework that currently powers the viewer) and the native-image tool.  Since Java Swing is a dead framework, this realistically isn't an issue that will be resolved.  Jpackage (or a third-party solution is currently 
+Currently there is a windows build of DumbSyslogViewer that has a self-contained JVM with a native launcher.  If you so desire, you can also use the jpackage too to do the same for linux or any other OS with full-featured JDKs available.  However, at this time, you cannot natively compile DumbSyslogViewer with GraalVM's native-image tool.  Well, you can compile it, but it won't run.  There's currently an issue with Java Swing (the GUI framework that currently powers the viewer) and the native-image tool.  Since Java Swing is a dead framework, this realistically isn't an issue that will be resolved.  Jpackage (or a third-party solution is currently 
