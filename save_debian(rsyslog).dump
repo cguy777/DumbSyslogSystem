@@ -1,1 +1,0 @@
-<85>Aug 10 21:14:58 debian-nginx sudo: dmitri.petrov : TTY=pts/0 ; PWD=/home/dmitri.petrov ; USER=root ; COMMAND=/usr/bin/systemctl restart rsyslog
