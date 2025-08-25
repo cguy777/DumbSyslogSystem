@@ -165,12 +165,12 @@ Hostname/address is self explanatory.  Interface port number is the port specifi
 ### Filters
 
 In order to understand the filter system, a quick refresher on the BSD syslog format is needed.  The components are:
-
 - PRI
 - timestamp
 - hostname
-- message body
-These components are layed out as follows:
+- message body  
+
+These components are layed out as follows:  
 <PRI>timestamp hostname messageBodyTheRestOfTheWay
 
 PRI is the facility number (facility means a particular subsystem) multiplied by 8, and then the severity added to it.  Severity level is inverse to the Severity number.  I.e., 0 is highest and 7 is lowest.  Technically the timestamp and hostname are conceptually grouped together as a "header", but it is easier and makes more sense to parse them as two separate components.  FYI, every byte in a BSD syslog message is read as a 1 byte character (ASCII).
