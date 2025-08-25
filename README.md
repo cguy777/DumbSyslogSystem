@@ -5,9 +5,9 @@ DumbSyslogSystem is a dumb-simple set of services/applications that provide sysl
 - DumbSyslogRelay
 - DumbSyslogViewer
 
-Their purpose should be mostly self-explanatory, but here's the explanation anyways: DumbSyslogServer provides traditional BSD syslog (RFC 3164) server capabilities.  It also provides a mechanism for the real-time viewing of syslogs as they are received.  DumbSyslogRelay is purely a relay for syslogs.  It simply receives syslogs, and then forwards them to a specified server.  DumbSyslogViewer is primarily designed to view logs as they are received, but will display all logs that are currently stored inside DumbSyslogServer's memory buffer.  DumbSyslogViewer also has the capability to filter messages based on hostname/address, message body content, facility, and severity.  
+Their purpose should be mostly self-explanatory, but here's the explanation anyways: DumbSyslogServer provides traditional BSD syslog (RFC 3164) server capabilities.  It also provides a mechanism for the real-time viewing of syslogs as they are received.  DumbSyslogRelay is purely a relay for syslogs.  It simply receives syslogs, and then forwards them to a specified server.  DumbSyslogViewer is primarily designed to view logs as they are received, but will display all logs that are currently stored inside DumbSyslogServer's memory buffer.  DumbSyslogViewer also has the capability to filter messages based on hostname/address, message body content, facility, and severity.  DumbSyslogSystem is licensed under the 3-clause BSD license.  
 
-## DumbSyslogServer Deployment Guide
+# DumbSyslogServer Deployment Guide
 
 This guide will walk you through a basic deployment of DumbSyslogServer on a fresh install of Debian 12.
 
@@ -77,7 +77,7 @@ sudo systemctl enable dumbsyslogserver
 
 You may not be excited by having to employ a JVM/JDK in order to use DumbSyslogServer.  However, if you choose GraalVM (I recommend the community edition for licensing reasons) as your deployment JVM/JDK, you can optionally natively compile DumbSyslogServer.  Simply call `native-image -jar DumbSyslogServer.jar` and a native executable will be output.  You can then directly call this executable instead of having to call `java -jar DumbSyslogServer`.  You may see an error similar to `It appears as though libz:.a is missing. Please install it.`  As of writing this, this can be satisfied with `sudo apt install libz-dev`  However, packages do change, and this may not be accurate in the future.  Other than satisfying that one specific dependency, you shouldn't have any trouble on a fresh install of Debian 12.  Again, this is not a required step, but it might satisfy a specific need or want that you may have.  If you go this route, you no longer need to call `java` from you systemd service, and you will also be calling the native executable, and not the jar file.
 
-## DumbSyslogRelay Deployment Guide
+# DumbSyslogRelay Deployment Guide
 
 This is a bare-bones guide for DumbSyslogRelay.  This is also based on Debian 12.
 
@@ -141,7 +141,7 @@ sudo systemctl enable dumbsyslogrelay
 
 You can also use GraalVM's native-image tool to natively compile DumbSyslogRelay.  See the same section for DumbSyslogServer.
 
-## DumbSyslogViewer
+# DumbSyslogViewer
 
 DumbSyslogViewer is a Java based desktop app that displays and filters logs in real-time.  If you're on windows, you can download DumbSyslogViewer pre-packaged with a JVM and a native windows launcher so you don't have to separately install Java.
 
@@ -327,3 +327,34 @@ Again, this is why it is typically recommended to only create filters through th
 ### native-image for DumbSyslogViewer?
 
 Currently there is a windows build of DumbSyslogViewer that has a self-contained JVM with a native launcher.  If you so desire, you can also use the jpackage too to do the same for linux or any other OS with full-featured JDKs available.  However, at this time, you cannot natively compile DumbSyslogViewer with GraalVM's native-image tool.  Well, you can compile it, but it won't run.  There's currently an issue with Java Swing (the GUI framework that currently powers the viewer) and the native-image tool.  Since Java Swing is a dead framework, this realistically isn't an issue that will be resolved.
+
+## License  
+
+BSD 3-Clause License  
+  
+Copyright (c) 2025, Noah McLean  
+  
+Redistribution and use in source and binary forms, with or without  
+modification, are permitted provided that the following conditions are met:  
+  
+1. Redistributions of source code must retain the above copyright notice, this  
+   list of conditions and the following disclaimer.  
+  
+2. Redistributions in binary form must reproduce the above copyright notice,  
+   this list of conditions and the following disclaimer in the documentation  
+   and/or other materials provided with the distribution.  
+
+3. Neither the name of the copyright holder nor the names of its  
+   contributors may be used to endorse or promote products derived from  
+   this software without specific prior written permission.  
+  
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"  
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE  
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE  
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE  
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL  
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR  
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER  
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,  
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE  
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.  
