@@ -5,3 +5,5 @@
 /logs
 ViewerSettings.soffit
 ActiveFilters.soffit
+config_server
+/log_archive

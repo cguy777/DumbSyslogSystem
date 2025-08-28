@@ -303,6 +303,24 @@ public class BSDSyslogMessage {
 		return pos;
 	}
 	
+	private static int parseHostname(byte[] bytes, int startPos, String remoteAddress, EncapsulatedString returnedHostname) {
+		EncapsulatedString hostname = new EncapsulatedString();
+		
+		int pos = parseWhitespacedToken(bytes, startPos, hostname);
+		if(pos == -1) {
+			returnedHostname.string = remoteAddress;
+			return -1;
+		}
+		
+		if(!SyslogUtils.isValidHostName(hostname.string)) {
+			returnedHostname.string = remoteAddress;
+			return -1;
+		}
+			
+		returnedHostname.string = hostname.string;
+		return pos;
+	}
+	
 	private static String getMonthFromNumber(int number) {
 		switch(number) {
 		case 1: return "Jan";
@@ -353,6 +371,55 @@ public class BSDSyslogMessage {
 	}
 	
 	public static BSDSyslogMessage parseMessage(byte[] bytes, InetAddress remoteAddress) {
+		BSDSyslogMessage bsdMessage = new BSDSyslogMessage();
+		
+		int bytePos = 0;
+		
+		//PRI
+		EncapsulatedInt parsedPRI = new EncapsulatedInt();
+		bytePos = parsePri(bytes, parsedPRI);
+		bsdMessage.pri = parsedPRI.integer;
+		
+		//Timestamp
+		//Start with the generated one first
+		bsdMessage.receivedTimestamp = generateTimestamp();
+		boolean hasTimestamp = false;
+		int timestampStart = findTimestampStart(bytes, bytePos);
+		if(timestampStart != -1) {
+			bytePos = timestampStart;
+			hasTimestamp = true;
+		}
+		EncapsulatedString timestamp = new EncapsulatedString();
+		if(hasTimestamp) {
+			
+			int afterTimePosition = parseTimestamp(bytes, timestampStart, timestamp, bsdMessage.receivedTimestamp);
+			if(afterTimePosition != -1)
+				bytePos = afterTimePosition;
+			
+			bsdMessage.originalTimestamp = timestamp.string;
+		} else {
+			//Use the time of reception in lieu of a self-reported timestamp
+			bsdMessage.originalTimestamp = bsdMessage.receivedTimestamp;
+		}
+		
+		//Hostname
+		EncapsulatedString hostname = new EncapsulatedString();
+		int hostnamePos = parseHostname(bytes, bytePos, remoteAddress, hostname);
+		bsdMessage.hostname = hostname.string;
+		if(hostnamePos != -1)
+			bytePos = hostnamePos;
+		
+		//Message
+		String message = "";
+		for(int i = bytePos; i < bytes.length; i++) {
+			message += (char) bytes[i];
+		}
+		bsdMessage.message = message.strip();
+		
+		return bsdMessage;
+	}
+	
+	public static BSDSyslogMessage parseMessage(byte[] bytes, String remoteAddress) {
 		BSDSyslogMessage bsdMessage = new BSDSyslogMessage();
 		
 		int bytePos = 0;

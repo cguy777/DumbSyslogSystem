@@ -31,9 +31,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package fibrous.syslog.dss;
 
+import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -45,6 +47,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Iterator;
 
+import fibrous.soffit.SoffitException;
 import fibrous.soffit.SoffitObject;
 import fibrous.soffit.SoffitUtil;
 
@@ -89,8 +92,8 @@ public class DumbSyslogServer {
 			allowSubscribers = true;
 		
 		syslogBuffer = new SyslogMessageBuffer(messageBufferCount);
-		subscriberHandler = new SubscriberHandler(interfacePort, syslogBuffer);
 		logFileManager = new LogFileManager(localLogStorageTimeHours, logStorageLocation, disregardTimestamp);
+		subscriberHandler = new SubscriberHandler(interfacePort, syslogBuffer, logFileManager);
 		syslogHandler = new SyslogHandler(syslogBuffer, subscriberHandler, logFileManager);
 	}
 	
@@ -100,7 +103,7 @@ public class DumbSyslogServer {
 		if(allowSubscribers)
 			subscriberHandlerThread = Thread.ofVirtual().start(subscriberHandler);
 		
-		System.out.println("DumbSyslogServer magic in the form of three platform threads and one virtual thread has started...");
+		System.out.println("DumbSyslogServer has started...");
 		
 		while(true) {
 			syslogSocket.receive(syslogPacket);
@@ -165,8 +168,7 @@ class SyslogHandler implements Runnable {
 			
 			BSDSyslogMessage syslogMessage = BSDSyslogMessage.parseMessage(data.data, data.address);
 			syslogBuffer.addMessage(syslogMessage);
-			logFileManager.writeLog(syslogMessage);
-			
+			logFileManager.addLogToWriteQueue(syslogMessage);
 			subscriberHandler.pushMessage(syslogMessage);
 		}
 		
@@ -242,11 +244,13 @@ class SubscriberHandler implements Runnable {
 	public volatile ArrayList<SyslogSubscriber> subscribers;
 	ServerSocket ss;
 	SyslogMessageBuffer buffer;
+	LogFileManager fileManager;
 	
-	public SubscriberHandler(int interfacePort, SyslogMessageBuffer buffer) throws IOException {
+	public SubscriberHandler(int interfacePort, SyslogMessageBuffer buffer, LogFileManager fileManager) throws IOException {
 		ss = new ServerSocket(interfacePort);
 		subscribers = new ArrayList<>();
 		this.buffer = buffer;
+		this.fileManager = fileManager;
 	}
 	
 	@Override
@@ -264,6 +268,10 @@ class SubscriberHandler implements Runnable {
 						sub.pushMessage(bufferedMessages.pollLast());
 					}
 					sub.performingInitialPush = false;
+					
+					//Initialize request handler
+					SubscriberReceiveHandler rxHandler = new SubscriberReceiveHandler(socket, sub, this, fileManager);
+					Thread.ofVirtual().start(rxHandler);
 				});
 			} catch (IOException e) {
 				e.printStackTrace();
@@ -289,21 +297,76 @@ class SubscriberHandler implements Runnable {
 	}
 }
 
+class SubscriberReceiveHandler implements Runnable {
+	
+	Socket s;
+	SyslogSubscriber sub;
+	SubscriberHandler subHandler;
+	LogFileManager fileManager;
+	
+	public SubscriberReceiveHandler(Socket s, SyslogSubscriber sub, SubscriberHandler subHandler, LogFileManager fileManager) {
+		this.s = s;
+		this.sub = sub;
+		this.subHandler = subHandler;
+		this.fileManager = fileManager;
+	}
+	
+	@Override
+	public void run() {
+		while(true) {
+			try {
+				SoffitObject s_reqRoot = SoffitUtil.ReadStream(s.getInputStream());
+				
+				SoffitObject s_req = s_reqRoot.getFirstObject();
+				String reqType = s_req.getType();
+				if(reqType.equals("GetArchive")) {
+					sendLogArchive();
+				}
+				
+			} catch (SoffitException | IOException e) {
+				subHandler.subscribers.remove(sub);
+				fileManager.archiveLocked = false;
+				break;
+			}
+		}
+		
+		try {
+			s.close();
+		} catch (IOException e) {}
+	}
+	
+	private void sendLogArchive() throws IOException {
+		SoffitObject s_root = new SoffitObject("root");
+		SoffitObject s_logArchive = new SoffitObject("LogArchive");
+		s_root.add(s_logArchive);
+		ArrayList<BSDSyslogMessage> syslogs = fileManager.compileLogArchive();
+		
+		for(int i = 0; i < syslogs.size(); i++) {
+			s_logArchive.add(syslogs.get(i).serialize());
+		}
+		
+		SoffitUtil.WriteStream(s_root, s.getOutputStream());
+	}
+}
+
 class LogFileManager implements Runnable {
 	volatile ArrayList<LogFile> knownFiles;
 	volatile ArrayList<Path> knownDirs;
+	volatile ArrayDeque<BSDSyslogMessage> logWriteQueue;
 	int logStorageHours;
 	long maxStorageTimeMillis;
 	String logStorageLocation;
 	boolean storeLogs;
 	boolean disregardTimestamp;
 	
+	volatile boolean archiveLocked = false;
+	
 	public LogFileManager(int logStorageHours, String logStorageLocation, boolean disregardTimestamp) {
 		knownFiles = new ArrayList<>();
 		knownDirs = new ArrayList<>();
+		logWriteQueue = new ArrayDeque<>();
 		this.logStorageHours = logStorageHours;
 		maxStorageTimeMillis = logStorageHours * 60 * 60 * 1000;
-		//maxStorageTimeMillis = logStorageHours * 1000;
 		this.logStorageLocation = logStorageLocation;
 		storeLogs = !logStorageLocation.isEmpty();
 		this.disregardTimestamp = disregardTimestamp;
@@ -311,6 +374,9 @@ class LogFileManager implements Runnable {
 		scanForLogs();
 	}
 
+	/**
+	 * Monitors for log file age and deletes if old enough
+	 */
 	@Override
 	public void run() {
 		//Don't perform any deletion if not configured to delete old logs
@@ -324,27 +390,41 @@ class LogFileManager implements Runnable {
 		ArrayList<LogFile> filesToPop = new ArrayList<>();
 		
 		while(true) {
-			for(int i = 0; i < knownFiles.size(); i++) {
-				if(knownFiles.get(i).creationTime + maxStorageTimeMillis < System.currentTimeMillis()) {
-					try {
-						java.nio.file.Files.delete(knownFiles.get(i).fullPath);
-						filesToPop.add(knownFiles.get(i));
-					} catch (IOException e) {
-						//Remove on failure
-						filesToPop.add(knownFiles.get(i));
+			if(!archiveLocked) {
+				
+				//Delete expired logs
+				for(int i = 0; i < knownFiles.size(); i++) {
+					if(knownFiles.get(i).creationTime + maxStorageTimeMillis < System.currentTimeMillis()) {
+						try {
+							java.nio.file.Files.delete(knownFiles.get(i).fullPath);
+							filesToPop.add(knownFiles.get(i));
+						} catch (IOException e) {
+							//Remove on failure
+							filesToPop.add(knownFiles.get(i));
+						}
 					}
 				}
-			}
-			
-			//Pop from known files list
-			for(int i = 0; i < filesToPop.size(); i++) {
-				knownFiles.remove(filesToPop.get(i));
+				
+				//Pop from known files list
+				for(int i = 0; i < filesToPop.size(); i++) {
+					knownFiles.remove(filesToPop.get(i));
+				}
+				
+				//Write new logs
+				while(!logWriteQueue.isEmpty()) {
+					BSDSyslogMessage message = logWriteQueue.pollLast();
+					writeLog(message);
+				}
 			}
 			
 			try {
 				Thread.sleep(60000);
 			} catch (InterruptedException e) {}
 		}
+	}
+	
+	public synchronized void addLogToWriteQueue(BSDSyslogMessage syslogMessage) {
+		logWriteQueue.push(syslogMessage);
 	}
 	
 	public void writeLog(BSDSyslogMessage syslogMessage) {
@@ -400,6 +480,35 @@ class LogFileManager implements Runnable {
 		}
 		
 		return false;
+	}
+	
+	public ArrayList<BSDSyslogMessage> compileLogArchive() throws IOException {
+		archiveLocked = true;
+		
+		ArrayList<BSDSyslogMessage> archive = new ArrayList<>();
+		FileReader reader;
+		BufferedReader br;
+		for(int i = 0; i < knownFiles.size(); i++) {
+			reader = new FileReader(knownFiles.get(i).fullPath.toFile());
+			br = new BufferedReader(reader);
+			
+			String fallbackHostname = knownFiles.get(i).fullPath.getParent().getFileName().toString();
+			
+			while(true) {
+				String line = br.readLine();
+				if(line != null) {
+					BSDSyslogMessage message = BSDSyslogMessage.parseMessage(line.getBytes(), fallbackHostname);
+					archive.add(message);
+				} else
+					break;
+			}
+			
+			br.close();
+			reader.close();
+		}
+		
+		archiveLocked = false;
+		return archive;
 	}
 	
 	private void scanForLogs() {

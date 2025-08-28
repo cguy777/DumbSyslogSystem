@@ -42,6 +42,8 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.SocketException;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Stack;
 
 import javax.swing.JFrame;
@@ -107,6 +109,7 @@ public class DumbSyslogViewer {
 		cli.addCommand(new CLIServerSet("server set", messageHandler, ios, this));
 		cli.addCommand(new CLIServerShow("server show", messageHandler, ios, this));
 		cli.addCommand(new CLIConnect("connect", messageHandler, ios));
+		cli.addCommand(new CLIGetLogArchive("get archive", filterManager, messageHandler, ios));
 		
 		console.enterButton.addActionListener(new DoCLIAction(cli, console, chb));
 		console.input.addKeyListener(new DoCLIAction(cli, console, chb));
@@ -174,6 +177,8 @@ class DataReceiveHandler implements Runnable {
 	FiGUIConsole console;
 	
 	volatile boolean connect = true;
+	
+	volatile boolean receivingArchive = false;
 	
 	public DataReceiveHandler(InetAddress serverAddress, int serverInterfacePort, FilterManager filterManager, FiGUIConsole console) {
 		this.serverAddress = serverAddress;
@@ -247,10 +252,53 @@ class DataReceiveHandler implements Runnable {
 		SoffitObject s_data = SoffitUtil.ReadStream(socket.getInputStream());
 		
 		SoffitObject s_encapedObject = s_data.getFirstObject();
-		if(s_encapedObject.getType().equals("BSDSyslogMessage")) {
+		String type = s_encapedObject.getType();
+		//Regular live message push
+		if(type.equals("BSDSyslogMessage")) {
 			BSDSyslogMessage message = BSDSyslogMessage.deserialize(s_encapedObject);
 			if(filterManager.evaluateMessage(message))
 				console.printLineToLog(message.getMessageAsFormattedString(false));
+		}
+		//Entire log archive
+		else if(type.equals("LogArchive")) {
+			//Re-writing timestamp
+			handleLogArchive(s_encapedObject, false, false, false);
+		}
+	}
+	
+	private void handleLogArchive(SoffitObject s_logArchive, boolean disregardOriginalTimestamp, boolean filter, boolean consolodate) {
+		String logStorageLocation = "./logs/";
+		ArrayList<SoffitObject> logs = s_logArchive.getAllObjects();
+		for(int i = 0; i < logs.size(); i++) {
+			BSDSyslogMessage message = BSDSyslogMessage.deserialize(logs.get(i));
+			writeLog(message, logStorageLocation, disregardOriginalTimestamp);
+		}
+		receivingArchive = false;
+	}
+	
+	public void writeLog(BSDSyslogMessage syslogMessage, String logStorageLocation, boolean disregardTimestamp) {
+
+		Path logDirPath = Path.of(logStorageLocation + syslogMessage.hostname);
+		try {
+			if(!java.nio.file.Files.exists(logDirPath))
+				java.nio.file.Files.createDirectories(logDirPath);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		try {
+			String fileName = null;
+			if(disregardTimestamp)
+				fileName = logStorageLocation + syslogMessage.hostname + "/" + SyslogUtils.getFileFriendlyTimestamp(syslogMessage.receivedTimestamp);
+			else
+				fileName = logStorageLocation + syslogMessage.hostname + "/" + SyslogUtils.getFileFriendlyTimestamp(syslogMessage.originalTimestamp);
+			
+			FileOutputStream fos = new FileOutputStream(fileName, true);
+			fos.write(syslogMessage.getMessageAsFormattedString(!disregardTimestamp).getBytes());
+			fos.write((int) '\n');
+			fos.close();
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
 	}
 }
