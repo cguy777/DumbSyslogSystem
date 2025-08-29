@@ -108,8 +108,7 @@ public class DumbSyslogServer {
 		while(true) {
 			syslogSocket.receive(syslogPacket);
 			SyslogData data = new SyslogData(syslogPacket);
-			syslogHandler.dataQueue.push(data);
-			syslogHandler.awaken();
+			syslogHandler.addSyslogData(data);
 		}
 	}
 	
@@ -165,7 +164,6 @@ class SyslogHandler implements Runnable {
 	private synchronized void processLogs() {
 		while(!dataQueue.isEmpty()) {
 			SyslogData data = dataQueue.pollLast();
-			
 			BSDSyslogMessage syslogMessage = BSDSyslogMessage.parseMessage(data.data, data.address);
 			syslogBuffer.addMessage(syslogMessage);
 			logFileManager.addLogToWriteQueue(syslogMessage);
@@ -177,7 +175,8 @@ class SyslogHandler implements Runnable {
 		} catch (InterruptedException e) {}
 	}
 	
-	public synchronized void awaken() {
+	public synchronized void addSyslogData(SyslogData data) {
+		dataQueue.push(data);
 		notify();
 	}
 }
@@ -283,7 +282,7 @@ class SubscriberHandler implements Runnable {
 		for(int i = 0; i < subscribers.size(); i++) {
 			SyslogSubscriber sub = subscribers.get(i);
 			while(true) {
-				if(sub.performingInitialPush) {
+				if(sub.performingInitialPush | fileManager.archiveLocked) {
 					try {
 						Thread.sleep(50);
 					} catch (InterruptedException e) {}
@@ -352,26 +351,31 @@ class SubscriberReceiveHandler implements Runnable {
 class LogFileManager implements Runnable {
 	volatile ArrayList<LogFile> knownFiles;
 	volatile ArrayList<Path> knownDirs;
-	volatile ArrayDeque<BSDSyslogMessage> logWriteQueue;
 	int logStorageHours;
 	long maxStorageTimeMillis;
 	String logStorageLocation;
 	boolean storeLogs;
 	boolean disregardTimestamp;
 	
+	QueuedLogFileWriter logWriter;
+	Thread logWriterThread;
+	
 	volatile boolean archiveLocked = false;
 	
 	public LogFileManager(int logStorageHours, String logStorageLocation, boolean disregardTimestamp) {
 		knownFiles = new ArrayList<>();
 		knownDirs = new ArrayList<>();
-		logWriteQueue = new ArrayDeque<>();
 		this.logStorageHours = logStorageHours;
 		maxStorageTimeMillis = logStorageHours * 60 * 60 * 1000;
 		this.logStorageLocation = logStorageLocation;
 		storeLogs = !logStorageLocation.isEmpty();
 		this.disregardTimestamp = disregardTimestamp;
 		
+		logWriter = new QueuedLogFileWriter(this);
+		
+		archiveLocked = true;
 		scanForLogs();
+		archiveLocked = false;
 	}
 
 	/**
@@ -379,19 +383,22 @@ class LogFileManager implements Runnable {
 	 */
 	@Override
 	public void run() {
-		//Don't perform any deletion if not configured to delete old logs
-		if(logStorageHours == 0)
+				
+		//Don't do any log file management if there is no intention of storing them in the first place
+		if(!storeLogs)
 			return;
 		
-		//Don't do any log file management if there is no intention to store them in the first place
-		if(!storeLogs)
+		//Start queued writer thread
+		logWriterThread = Thread.ofPlatform().start(logWriter);
+		
+		//Don't delete logs if they're to be permanently stored.
+		if(logStorageHours == 0)
 			return;
 		
 		ArrayList<LogFile> filesToPop = new ArrayList<>();
 		
 		while(true) {
-			if(!archiveLocked) {
-				
+			if(!archiveLocked) {				
 				//Delete expired logs
 				for(int i = 0; i < knownFiles.size(); i++) {
 					if(knownFiles.get(i).creationTime + maxStorageTimeMillis < System.currentTimeMillis()) {
@@ -409,12 +416,6 @@ class LogFileManager implements Runnable {
 				for(int i = 0; i < filesToPop.size(); i++) {
 					knownFiles.remove(filesToPop.get(i));
 				}
-				
-				//Write new logs
-				while(!logWriteQueue.isEmpty()) {
-					BSDSyslogMessage message = logWriteQueue.pollLast();
-					writeLog(message);
-				}
 			}
 			
 			try {
@@ -423,45 +424,8 @@ class LogFileManager implements Runnable {
 		}
 	}
 	
-	public synchronized void addLogToWriteQueue(BSDSyslogMessage syslogMessage) {
-		logWriteQueue.push(syslogMessage);
-	}
-	
-	public void writeLog(BSDSyslogMessage syslogMessage) {
-		//Don't write logs if not storing
-		if(!storeLogs)
-			return;
-
-		Path logDirPath = Path.of(logStorageLocation + syslogMessage.hostname);
-		if(!hasDir(logDirPath)) {
-			try {
-				if(!java.nio.file.Files.exists(logDirPath))
-					java.nio.file.Files.createDirectories(logDirPath);
-				
-				knownDirs.add(logDirPath);
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
-		
-		try {
-			String fileName = null;
-			if(disregardTimestamp)
-				fileName = logStorageLocation + syslogMessage.hostname + "/" + SyslogUtils.getFileFriendlyTimestamp(syslogMessage.receivedTimestamp);
-			else
-				fileName = logStorageLocation + syslogMessage.hostname + "/" + SyslogUtils.getFileFriendlyTimestamp(syslogMessage.originalTimestamp);
-			
-			FileOutputStream fos = new FileOutputStream(fileName, true);
-			fos.write(syslogMessage.getMessageAsFormattedString(!disregardTimestamp).getBytes());
-			fos.write((int) '\n');
-			fos.close();
-			knownFiles.add(new LogFile(Path.of(fileName), System.currentTimeMillis()));
-		} catch(FileNotFoundException e) {
-			//Somebody/something might've cleaned up the directories.
-			knownDirs.remove(logDirPath);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+	public void addLogToWriteQueue(BSDSyslogMessage message) {
+		logWriter.addLogToWriteQueue(message);
 	}
 	
 	public boolean hasFile(Path file) {
@@ -546,5 +510,82 @@ class LogFile {
 	public LogFile(Path fullPath, long creationTime) {
 		this.fullPath = fullPath;
 		this.creationTime = creationTime;
+	}
+}
+
+class QueuedLogFileWriter implements Runnable {
+	
+	LogFileManager fileManager;
+	volatile ArrayDeque<BSDSyslogMessage> logWriteQueue;
+	
+	public QueuedLogFileWriter(LogFileManager fileManager) {
+		this.fileManager = fileManager;
+		logWriteQueue = new ArrayDeque<>();
+	}
+
+	@Override
+	public void run() {
+		while(true) {
+			process();
+		}
+	}
+	
+	public synchronized void process() {
+		while(!logWriteQueue.isEmpty()) {
+			if(fileManager.archiveLocked) {
+				//Just sleep, wait, and try again if the file system is locked
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {}
+			} else {
+				writeLog(logWriteQueue.pollLast());
+			}
+		}
+		
+		try {
+			wait();
+		} catch (InterruptedException e) {}
+	}
+	
+	public synchronized void addLogToWriteQueue(BSDSyslogMessage syslogMessage) {
+		logWriteQueue.push(syslogMessage);
+		notify();
+	}
+	
+	public void writeLog(BSDSyslogMessage syslogMessage) {
+		Path logDirPath = Path.of(fileManager.logStorageLocation + syslogMessage.hostname);
+		if(!fileManager.hasDir(logDirPath)) {
+			try {
+				if(!java.nio.file.Files.exists(logDirPath))
+					java.nio.file.Files.createDirectories(logDirPath);
+				
+				fileManager.knownDirs.add(logDirPath);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		
+		try {
+			String fileName = null;
+			if(fileManager.disregardTimestamp)
+				fileName = fileManager.logStorageLocation + syslogMessage.hostname + "/" + SyslogUtils.getFileFriendlyTimestamp(syslogMessage.receivedTimestamp);
+			else
+				fileName = fileManager.logStorageLocation + syslogMessage.hostname + "/" + SyslogUtils.getFileFriendlyTimestamp(syslogMessage.originalTimestamp);
+			
+			FileOutputStream fos = new FileOutputStream(fileName, true);
+			fos.write(syslogMessage.getMessageAsFormattedString(!fileManager.disregardTimestamp).getBytes());
+			fos.write((int) '\n');
+			fos.close();
+			
+			Path logFilePath = Path.of(fileName);
+			if(!fileManager.hasFile(logFilePath))
+				fileManager.knownFiles.add(new LogFile(logFilePath, System.currentTimeMillis()));
+			
+		} catch(FileNotFoundException e) {
+			//Somebody/something might've cleaned up the directories.
+			fileManager.knownDirs.remove(logDirPath);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 }

@@ -1,0 +1,2 @@
+1.1.0
+- Added "get archive" command to viewer and corresponding code to the server.  This will download all written-to-disk logs to the viewer's working directory. 

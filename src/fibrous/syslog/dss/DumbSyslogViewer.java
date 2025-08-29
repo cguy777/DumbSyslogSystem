@@ -35,14 +35,18 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.io.BufferedWriter;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.SocketException;
 import java.nio.file.Path;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Stack;
 
@@ -63,7 +67,7 @@ public class DumbSyslogViewer {
 	FiGUIConsole console;
 	CommandHistoryBuffer chb;
 	
-	DataReceiveHandler messageHandler;
+	DataReceiveHandler receiveHandler;
 	Thread messageHandlerThread;
 	
 	boolean configured = false;
@@ -91,7 +95,7 @@ public class DumbSyslogViewer {
 		}
 		console.filterEditor.setText(SoffitUtil.WriteStreamToString(filterManager.serializeActiveFilters()));
 		
-		messageHandler = new DataReceiveHandler(null, -1, filterManager, console);
+		receiveHandler = new DataReceiveHandler(null, -1, filterManager, console);
 		
 		GUIIOStream ios = new GUIIOStream(console);
 		
@@ -104,12 +108,12 @@ public class DumbSyslogViewer {
 		cli.addCommand(new CLIRemoveFilter("rem", filterManager, ios));
 		cli.addCommand(new CLIEnableFilter("enable", filterManager, ios));
 		cli.addCommand(new CLIDisableFilter("disable", filterManager, ios));
-		cli.addCommand(new CLIApplyFilters("apply", filterManager, messageHandler, ios));
+		cli.addCommand(new CLIApplyFilters("apply", filterManager, receiveHandler, ios));
 		cli.addCommand(new CLIClearConsole("clear console", ios));
-		cli.addCommand(new CLIServerSet("server set", messageHandler, ios, this));
-		cli.addCommand(new CLIServerShow("server show", messageHandler, ios, this));
-		cli.addCommand(new CLIConnect("connect", messageHandler, ios));
-		cli.addCommand(new CLIGetLogArchive("get archive", filterManager, messageHandler, ios));
+		cli.addCommand(new CLIServerSet("server set", receiveHandler, ios, this));
+		cli.addCommand(new CLIServerShow("server show", receiveHandler, ios, this));
+		cli.addCommand(new CLIConnect("connect", receiveHandler, ios));
+		cli.addCommand(new CLIGetLogArchive("get archive", filterManager, receiveHandler, ios));
 		
 		console.enterButton.addActionListener(new DoCLIAction(cli, console, chb));
 		console.input.addKeyListener(new DoCLIAction(cli, console, chb));
@@ -128,8 +132,8 @@ public class DumbSyslogViewer {
 	
 	public void writeSettings() {
 		SoffitObject s_settings = new SoffitObject("root");
-		s_settings.add(new SoffitField("ServerHostname", messageHandler.serverAddress.getHostAddress()));
-		s_settings.add(new SoffitField("ServerInterfacePort", String.valueOf(messageHandler.serverInterfacePort)));
+		s_settings.add(new SoffitField("ServerHostname", receiveHandler.serverAddress.getHostAddress()));
+		s_settings.add(new SoffitField("ServerInterfacePort", String.valueOf(receiveHandler.serverInterfacePort)));
 		
 		try {
 			FileOutputStream fos = new FileOutputStream("ViewerSettings.soffit");
@@ -146,8 +150,8 @@ public class DumbSyslogViewer {
 			SoffitObject s_settings = SoffitUtil.ReadStream(fis);
 			fis.close();
 			
-			messageHandler.serverAddress = InetAddress.getByName(s_settings.getField("ServerHostname").getValue());
-			messageHandler.serverInterfacePort = Integer.parseInt(s_settings.getField("ServerInterfacePort").getValue());
+			receiveHandler.serverAddress = InetAddress.getByName(s_settings.getField("ServerHostname").getValue());
+			receiveHandler.serverInterfacePort = Integer.parseInt(s_settings.getField("ServerInterfacePort").getValue());
 			
 			configured = true;
 		} catch(FileNotFoundException e) {
@@ -158,7 +162,7 @@ public class DumbSyslogViewer {
 	}
 	
 	public void receiveData() {
-		messageHandlerThread = Thread.ofVirtual().start(messageHandler);
+		messageHandlerThread = Thread.ofVirtual().start(receiveHandler);
 	}
 	
 	public static void main(String[]args) throws SoffitException, IOException {
@@ -180,6 +184,9 @@ class DataReceiveHandler implements Runnable {
 	
 	volatile boolean receivingArchive = false;
 	
+	boolean archive_filter = false;
+	boolean archive_consolodate = false;
+	
 	public DataReceiveHandler(InetAddress serverAddress, int serverInterfacePort, FilterManager filterManager, FiGUIConsole console) {
 		this.serverAddress = serverAddress;
 		this.serverInterfacePort = serverInterfacePort;
@@ -189,6 +196,7 @@ class DataReceiveHandler implements Runnable {
 	
 	@Override
 	public void run() {
+		long lastConnectionAttemptTime = 0;
 		while(true) {
 			if(serverAddress == null)
 				connect = false;
@@ -203,15 +211,24 @@ class DataReceiveHandler implements Runnable {
 			try {
 				console.clearLog();
 				console.printLineToConsole("Connecting to server...");
+				
+				//Annoying stuff to not spam the console during certain connection problems 
+				long currentConnectionAttemptTime = System.currentTimeMillis();
+				long connectionAttemptDelta = currentConnectionAttemptTime - lastConnectionAttemptTime;
+				if(connectionAttemptDelta < 5000) {
+					Thread.sleep(5000 - connectionAttemptDelta);
+				}
+				
 				socket = new Socket(serverAddress, serverInterfacePort);
 				console.printLineToConsole("Connected to server.  Will begin receiving logs");
 			} catch (IOException e) {
+				lastConnectionAttemptTime = System.currentTimeMillis();
 				console.printToConsole("Could not connect to server.");
 				if(connect)
 					console.printToConsole("  Will try again.");
 				console.printToConsole("\n");
 				continue;
-			}
+			} catch (InterruptedException e) {}
 			
 			while(true) {
 				if(!connect) {
@@ -262,17 +279,28 @@ class DataReceiveHandler implements Runnable {
 		//Entire log archive
 		else if(type.equals("LogArchive")) {
 			//Re-writing timestamp
-			handleLogArchive(s_encapedObject, false, false, false);
+			handleLogArchive(s_encapedObject, false, archive_filter, archive_consolodate);
 		}
 	}
 	
 	private void handleLogArchive(SoffitObject s_logArchive, boolean disregardOriginalTimestamp, boolean filter, boolean consolodate) {
 		String logStorageLocation = "./logs/";
 		ArrayList<SoffitObject> logs = s_logArchive.getAllObjects();
-		for(int i = 0; i < logs.size(); i++) {
-			BSDSyslogMessage message = BSDSyslogMessage.deserialize(logs.get(i));
-			writeLog(message, logStorageLocation, disregardOriginalTimestamp);
+		
+		if(consolodate) {
+			writeConsolodatedLog(logs, logStorageLocation, filter);
+		} else {
+			for(int i = 0; i < logs.size(); i++) {
+				BSDSyslogMessage message = BSDSyslogMessage.deserialize(logs.get(i));
+				
+				//If we are filtering AND fail a filter evaluation, then skip this message
+				if(filter && !filterManager.evaluateMessage(message))
+					continue;
+			
+				writeLog(message, logStorageLocation, disregardOriginalTimestamp);
+			}
 		}
+		
 		receivingArchive = false;
 	}
 	
@@ -299,6 +327,115 @@ class DataReceiveHandler implements Runnable {
 			fos.close();
 		} catch (IOException e) {
 			e.printStackTrace();
+		}
+	}
+	
+	public void writeConsolodatedLog(ArrayList<SoffitObject> logs, String logStorageLocation, boolean filter) {
+		Path logDirPath = Path.of(logStorageLocation);
+		try {
+			if(!java.nio.file.Files.exists(logDirPath))
+				java.nio.file.Files.createDirectories(logDirPath);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		ArrayList<BSDSyslogMessage> syslogs = new ArrayList<>(logs.size());
+		ArrayList<Long> times = new ArrayList<>(logs.size());
+		for(int i = 0; i < logs.size(); i++) {
+			BSDSyslogMessage syslog = BSDSyslogMessage.deserialize(logs.get(i));
+			
+			//Filter evaluation
+			if(filter && !filterManager.evaluateMessage(syslog))
+				continue;
+			
+			if(syslogs.isEmpty()) {
+				syslogs.add(syslog);
+				times.add(timestampToLong(syslog.originalTimestamp));
+			} else {
+				insertSortSyslog(syslogs, times, syslog);
+			}
+		}
+		
+		try {
+			FileWriter fw = new FileWriter(logStorageLocation + "ConsolidatedLog");
+			BufferedWriter bw = new BufferedWriter(fw);
+			
+			for(int i = 0; i < syslogs.size(); i++) {
+				bw.write(syslogs.get(i).getMessageAsFormattedString(true));
+				bw.newLine();
+			}
+			
+			bw.flush();
+			bw.close();
+			fw.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public void insertSortSyslog(ArrayList<BSDSyslogMessage> syslogs, ArrayList<Long> times, BSDSyslogMessage syslog) {
+		long time = timestampToLong(syslog.originalTimestamp);
+		for(int i = 0; i < syslogs.size(); i++) {
+			if(time < times.get(i)) {
+				syslogs.add(i, syslog);
+				times.add(i, time);
+				return;
+			}
+		}
+
+		syslogs.add(syslog);
+		times.add(time);
+	}
+	
+	//Returns a derived long that is simply for comparison between other values generated ONLY from this function.  
+	public long timestampToLong(String timestamp) {
+		String monthStr = "";
+		String dayStr = "";
+		String hourStr = "";
+		String minuteStr = "";
+		String secondStr = "";
+		
+		//fill month
+		monthStr = timestamp.substring(0, 3);
+		
+		//fill day
+		dayStr = timestamp.substring(4, 6);
+		
+		//fill time
+		hourStr = timestamp.substring(7, 9);
+		minuteStr = timestamp.substring(10, 12);
+		secondStr = timestamp.substring(13);
+		
+		int month = getNumFromMonth(monthStr);
+		int day = Integer.parseInt(dayStr);
+		int hour = Integer.parseInt(hourStr);
+		int minute = Integer.parseInt(minuteStr);
+		int second = Integer.parseInt(secondStr);
+		
+		long comboValue = second;
+		comboValue += minute * 100;
+		comboValue += hour * 10000;
+		comboValue += day * 1000000;
+		comboValue += month * 100000000;
+		
+		return comboValue;
+	}
+	
+	public int getNumFromMonth(String month) {
+		switch(month) {
+		case "Jan": return 1;
+		case "Feb": return 2;
+		case "Mar": return 3;
+		case "Apr": return 4;
+		case "May": return 5;
+		case "Jun": return 6;
+		case "Jul": return 7;
+		case "Aug": return 8;
+		case "Sep": return 9;
+		case "Oct": return 10;
+		case "Nov": return 11;
+		case "Dec": return 12;
+		default: return -1;
 		}
 	}
 }

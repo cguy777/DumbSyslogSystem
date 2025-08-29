@@ -38,13 +38,13 @@ import fibrous.ficli.FiCommand;
 
 public class CLIServerShow extends FiCommand {
 	
-	DataReceiveHandler drh;
+	DataReceiveHandler receiveHandler;
 	GUIIOStream ios;
 	DumbSyslogViewer viewer;
 
-	public CLIServerShow(String commandString, DataReceiveHandler drh, GUIIOStream ios, DumbSyslogViewer viewer) {
+	public CLIServerShow(String commandString, DataReceiveHandler receiveHandler, GUIIOStream ios, DumbSyslogViewer viewer) {
 		super(commandString);
-		this.drh = drh;
+		this.receiveHandler = receiveHandler;
 		this.ios = ios;
 		this.viewer = viewer;
 		
@@ -54,8 +54,8 @@ public class CLIServerShow extends FiCommand {
 	@Override
 	public void execute() {
 		if(viewer.configured) {
-			ios.println("IP Address: " + drh.serverAddress.getHostAddress());
-			ios.println("port: " + drh.serverInterfacePort);
+			ios.println("IP Address: " + receiveHandler.serverAddress.getHostAddress());
+			ios.println("port: " + receiveHandler.serverInterfacePort);
 		} else {
 			ios.println("Not currently configured to a server.  Please call \"server set\"");
 		}

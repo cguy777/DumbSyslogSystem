@@ -40,39 +40,60 @@ import fibrous.soffit.SoffitUtil;
 public class CLIGetLogArchive extends FiCommand {
 	
 	FilterManager filterManager;
-	DataReceiveHandler messageHandler;
+	DataReceiveHandler receiveHandler;
 	GUIIOStream ios;
 
-	public CLIGetLogArchive(String commandString, FilterManager filterManager, DataReceiveHandler messageHandler, GUIIOStream ios) {
+	public CLIGetLogArchive(String commandString, FilterManager filterManager, DataReceiveHandler receiveHandler, GUIIOStream ios) {
 		super(commandString);
 		this.filterManager = filterManager;
-		this.messageHandler = messageHandler;
+		this.receiveHandler = receiveHandler;
 		this.ios = ios;
 		
-		this.commandDescription = "Retrieves all logs from the server.  Usage: get archive [(optional: use filters) true | false] [(optional: consolodate logs) true | false]";
+		this.commandDescription = "Retrieves all logs from the server.  Usage: get archive [(optional) --filter] [(optional) --consolidate]";
 	}
 
 	@Override
 	public void execute() {
+		
+		//Set command switches
+		boolean filter = false;
+		boolean consolodate = false;
+		for(int i = 0; i < arguments.size(); i++) {
+			switch(arguments.get(i)) {
+			case "--filter":
+				filter = true;
+				break;
+			case "--consolidate":
+				consolodate = true;
+				break;
+			default:
+				ios.println("Syntax error: invalid argument");
+				return;
+			}
+		}
+		
+		receiveHandler.archive_filter = filter;
+		receiveHandler.archive_consolodate = consolodate;
+		
 		SoffitObject s_reqRoot = new SoffitObject("root");
 		SoffitObject s_archiveRequest = new SoffitObject("GetArchive");
 		s_reqRoot.add(s_archiveRequest);
 		
 		try {
-			SoffitUtil.WriteStream(s_reqRoot, messageHandler.socket.getOutputStream());
+			SoffitUtil.WriteStream(s_reqRoot, receiveHandler.socket.getOutputStream());
 		} catch (IOException e) {
 			ios.println(e.getMessage());
 			return;
 		}
 		
 		Thread.ofVirtual().start(() -> {
-			messageHandler.receivingArchive = true;
+			receiveHandler.receivingArchive = true;
 			ios.println("Retrieving log archive...");
 			do {
 				try {
 					Thread.sleep(250);
 				} catch (InterruptedException e) {}
-			} while(messageHandler.receivingArchive);
+			} while(receiveHandler.receivingArchive);
 			ios.println("Log archive has been downloaded in application directory");
 		});
 	}

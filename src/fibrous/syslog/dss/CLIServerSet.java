@@ -38,13 +38,13 @@ import fibrous.ficli.FiCommand;
 
 public class CLIServerSet extends FiCommand {
 	
-	DataReceiveHandler drh;
+	DataReceiveHandler receiveHandler;
 	GUIIOStream ios;
 	DumbSyslogViewer viewer;
 
-	public CLIServerSet(String commandString, DataReceiveHandler drh, GUIIOStream ios, DumbSyslogViewer viewer) {
+	public CLIServerSet(String commandString, DataReceiveHandler receiveHandler, GUIIOStream ios, DumbSyslogViewer viewer) {
 		super(commandString);
-		this.drh = drh;
+		this.receiveHandler = receiveHandler;
 		this.ios = ios;
 		this.viewer = viewer;
 		
@@ -67,10 +67,10 @@ public class CLIServerSet extends FiCommand {
 				return;
 			}
 			
-			drh.serverAddress = serverAddress;
-			drh.serverInterfacePort = serverPort;
-			drh.connect = false;
-			drh.resetConnection();
+			receiveHandler.serverAddress = serverAddress;
+			receiveHandler.serverInterfacePort = serverPort;
+			receiveHandler.connect = false;
+			receiveHandler.resetConnection();
 			viewer.writeSettings();
 			viewer.configured = true;
 			

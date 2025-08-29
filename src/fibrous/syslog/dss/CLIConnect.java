@@ -38,12 +38,12 @@ import fibrous.ficli.FiCommand;
 
 public class CLIConnect extends FiCommand {
 	
-	DataReceiveHandler drh;
+	DataReceiveHandler receiveHandler;
 	GUIIOStream ios;
 
-	public CLIConnect(String commandString, DataReceiveHandler drh, GUIIOStream ios) {
+	public CLIConnect(String commandString, DataReceiveHandler receiveHandler, GUIIOStream ios) {
 		super(commandString);
-		this.drh = drh;
+		this.receiveHandler = receiveHandler;
 		this.ios = ios;
 		
 		this.commandDescription = "Attempts to establish a connection to the configured server.  Usage: connect";
@@ -51,7 +51,7 @@ public class CLIConnect extends FiCommand {
 
 	@Override
 	public void execute() {
-		drh.resetConnection();
-		drh.connect = true;
+		receiveHandler.resetConnection();
+		receiveHandler.connect = true;
 	}
 }

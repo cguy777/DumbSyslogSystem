@@ -44,13 +44,13 @@ import fibrous.syslog.dss.DataReceiveHandler;
 public class CLIApplyFilters extends FiCommand {
 	
 	FilterManager filterManager;
-	DataReceiveHandler messageHandler;
+	DataReceiveHandler receiveHandler;
 	GUIIOStream ios;
 
-	public CLIApplyFilters(String commandString, FilterManager filterManager, DataReceiveHandler messageHandler, GUIIOStream ios) {
+	public CLIApplyFilters(String commandString, FilterManager filterManager, DataReceiveHandler receiveHandler, GUIIOStream ios) {
 		super(commandString);
 		this.filterManager = filterManager;
-		this.messageHandler = messageHandler;
+		this.receiveHandler = receiveHandler;
 		this.ios = ios;
 		
 		this.commandDescription = "Reloads the logs with the current filters applied.  Usage: apply";
@@ -87,7 +87,7 @@ public class CLIApplyFilters extends FiCommand {
 		}
 		
 		ios.clearLogs();
-		messageHandler.resetConnection();
+		receiveHandler.resetConnection();
 		
 		ios.showTab(0);
 	}
