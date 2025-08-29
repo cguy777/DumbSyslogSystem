@@ -10,10 +10,10 @@ __SoffitStart
 #514 is the standard port 
 SyslogPort "514"
 
-#Uncomment this to save syslog messages based on the time this server received the messages.
-#The data inside the file will always have the self-reported timestamp, if available.
+#This setting forces the server to always disregard the syslog message's self-reported timestamp and only utilize a timestamp generated at the time of message reception.
 #Badly formatted syslog messages will always have a generated timestamp based on when the message was received.
-#DisregardTimestamp "True"
+#Comment this out if you want to use the self reported timestamp instead.
+DisregardTimestamp "True"
 
 #The TCP port on which a user interface will connect on.
 #Default recommended port is 54321.
